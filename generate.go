@@ -22,6 +22,18 @@ const (
 	generateTimeout = 120 * time.Second
 )
 
+// ollamaClient is a reusable HTTP client with keep-alive transport.
+var ollamaClient = &http.Client{
+	Timeout: generateTimeout,
+	Transport: &http.Transport{
+		MaxIdleConns:    5,
+		IdleConnTimeout: 90 * time.Second,
+	},
+}
+
+// ollamaModelOverride overrides the LLM model when set via --model flag.
+var ollamaModelOverride string
+
 // OllamaChatMessage represents a message in the chat API.
 type OllamaChatMessage struct {
 	Role    string `json:"role"`
@@ -118,7 +130,10 @@ func generateAnswer(messages []OllamaChatMessage) (string, error) {
 		baseURL = ollamaBaseURL
 	}
 
-	model := os.Getenv("LLM_MODEL")
+	model := ollamaModelOverride
+	if model == "" {
+		model = os.Getenv("LLM_MODEL")
+	}
 	if model == "" {
 		model = defaultLLMModel
 	}
@@ -135,8 +150,7 @@ func generateAnswer(messages []OllamaChatMessage) (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	client := &http.Client{Timeout: generateTimeout}
-	resp, err := client.Post(baseURL+"/api/chat", "application/json", bytes.NewReader(body))
+	resp, err := ollamaClient.Post(baseURL+"/api/chat", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("Ollama chat request failed: %w", err)
 	}

@@ -31,8 +31,15 @@ func main() {
 	// Command line flags
 	dbPath := flag.String("db", "",
 		"Path to the database (default: ~/.config/rag-mcp/rag.db)")
+	model := flag.String("model", "",
+		"LLM model for answer generation (overrides LLM_MODEL env, default: gemma3:4b)")
 	showHelp := flag.Bool("h", false, "Show help")
 	flag.Parse()
+
+	// Apply model override
+	if *model != "" {
+		ollamaModelOverride = *model
+	}
 
 	if *showHelp {
 		fmt.Fprintf(os.Stderr, "Usage: rag-mcp [options]\n\n")
@@ -44,6 +51,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  OLLAMA_BASE_URL     Ollama API URL (default: http://localhost:11434)\n")
 		fmt.Fprintf(os.Stderr, "  EMBEDDING_MODEL     Embedding model (default: embeddinggemma:latest)\n")
 		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: gemma3:4b)\n")
+		fmt.Fprintf(os.Stderr, "\nModel priority: --model flag > LLM_MODEL env > default (gemma3:4b)\n")
 		os.Exit(0)
 	}
 
