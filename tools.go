@@ -39,6 +39,7 @@ func tools(kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
 		ragIngestTool(kv),
 		ragQueryTool(kv),
 		ragDeleteTool(kv),
+		ragListTool(kv),
 	}
 }
 
@@ -206,6 +207,54 @@ an answer using the LLM.`),
 			result += strings.Join(chunkSummary, "\n")
 
 			return mcp.NewToolResultText(result), nil
+		},
+	}
+}
+
+// ─── rag_list ────────────────────────────────────────────────────────────────────
+
+// ragListTool lists document keys in the knowledge base.
+// Without arguments, lists all top-level document keys.
+// With a key prefix, lists chunks under that prefix.
+func ragListTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+	opt := mcp.NewTool("rag_list",
+		mcp.WithDescription(`List document keys or chunks in the RAG knowledge base.
+Without arguments, lists all top-level document keys.
+With a key prefix, lists chunks under that document.`),
+		mcp.WithString("key",
+			mcp.Description("Optional key prefix to list (e.g. rag/docs/cooksy/architecture). Lists all top-level keys if omitted."),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: opt,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			args := request.GetArguments()
+
+			prefix, hasPrefix := args["key"].(string)
+			if !hasPrefix || prefix == "" {
+				prefix = ""
+			}
+
+			var entries []string
+			for key := range kv.List(prefix) {
+				entries = append(entries, key)
+			}
+
+			if len(entries) == 0 {
+				if prefix == "" {
+					return mcp.NewToolResultText("Knowledge base is empty."), nil
+				}
+				return mcp.NewToolResultText(fmt.Sprintf("No entries found under '%s'.", prefix)), nil
+			}
+
+			out := fmt.Sprintf("Found %d entries:\n", len(entries))
+			for _, e := range entries {
+				out += fmt.Sprintf("  %s\n", e)
+			}
+			return mcp.NewToolResultText(out), nil
 		},
 	}
 }

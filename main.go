@@ -43,7 +43,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nEnvironment variables:\n")
 		fmt.Fprintf(os.Stderr, "  OLLAMA_BASE_URL     Ollama API URL (default: http://localhost:11434)\n")
 		fmt.Fprintf(os.Stderr, "  EMBEDDING_MODEL     Embedding model (default: embeddinggemma:latest)\n")
-		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: qcwind/qwen2.5-7B-instruct-Q4_K_M:latest)\n")
+		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: gemma3:4b)\n")
 		os.Exit(0)
 	}
 

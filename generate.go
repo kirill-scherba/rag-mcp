@@ -17,7 +17,7 @@ import (
 
 // Default LLM models and Ollama settings.
 const (
-	defaultLLMModel = "qcwind/qwen2.5-7B-instruct-Q4_K_M:latest"
+	defaultLLMModel = "gemma3:4b" // "qwen2.5:1.5b"
 	ollamaBaseURL   = "http://localhost:11434"
 	generateTimeout = 120 * time.Second
 )
