@@ -5,59 +5,335 @@
 package main
 
 import (
+	"math"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
-// minChunkSize is the minimum number of characters per chunk.
-// Shorter chunks get merged with the previous one.
-const minChunkSize = 100
+// Constants for chunking strategy.
+const (
+	// minChunkSize is the minimum number of characters per chunk.
+	// Shorter chunks get merged with the previous one.
+	minChunkSize = 500
 
-// chunkText splits text into chunks by paragraphs (double newline).
-// Paragraphs shorter than minChunkSize are merged with the previous chunk.
-func chunkText(text string) []string {
+	// targetChunkSize is the target number of characters per chunk.
+	targetChunkSize = 1200
+
+	// maxChunkSize is the hard maximum character count per chunk.
+	maxChunkSize = 2000
+
+	// overlapSentences is the number of sentences to carry over
+	// from the previous chunk to maintain context across boundaries.
+	overlapSentences = 2
+)
+
+// sentenceIter splits text into sentences and yields them one at a time.
+type sentenceIter struct {
+	text  string
+	pos   int
+	done  bool
+}
+
+// next returns the next sentence (start, end) byte offsets.
+// Returns (0, 0, true) when iteration is complete.
+func (it *sentenceIter) next() (int, int, bool) {
+	if it.done {
+		return 0, 0, true
+	}
+
+	// Skip leading whitespace
+	for it.pos < len(it.text) {
+		r, size := utf8.DecodeRuneInString(it.text[it.pos:])
+		if !unicode.IsSpace(r) {
+			break
+		}
+		it.pos += size
+	}
+
+	if it.pos >= len(it.text) {
+		it.done = true
+		return 0, 0, true
+	}
+
+	start := it.pos
+	runes := []rune(it.text[it.pos:])
+	runeLen := len(runes)
+
+	for i := 0; i < runeLen; i++ {
+		r := runes[i]
+		// Check for sentence-ending punctuation
+		if r == '.' || r == '!' || r == '?' {
+			// Look ahead: end of string or whitespace
+			if i+1 >= runeLen || unicode.IsSpace(runes[i+1]) {
+				// Include the punctuation and trailing whitespace
+				end := i + 1
+				for end < runeLen && unicode.IsSpace(runes[end]) {
+					end++
+				}
+				byteEnd := it.pos + len(string(runes[:end]))
+				if byteEnd > len(it.text) {
+					byteEnd = len(it.text)
+				}
+				it.pos = byteEnd
+				if it.pos >= len(it.text) {
+					it.done = true
+				}
+				return start, it.pos, false
+			}
+		}
+		// Handle ellipsis
+		if r == '\u2026' { // …
+			end := i + 1
+			for end < runeLen && unicode.IsSpace(runes[end]) {
+				end++
+			}
+			byteEnd := it.pos + len(string(runes[:end]))
+			if byteEnd > len(it.text) {
+				byteEnd = len(it.text)
+			}
+			it.pos = byteEnd
+			if it.pos >= len(it.text) {
+				it.done = true
+			}
+			return start, it.pos, false
+		}
+	}
+
+	// No sentence boundary found — rest of text is one sentence
+	it.pos = len(it.text)
+	it.done = true
+	return start, it.pos, false
+}
+
+// chunkTextSemantic splits text into semantically meaningful chunks.
+// It splits by sentences, groups them until targetChunkSize is reached,
+// and preserves overlapSentences from the previous chunk for context continuity.
+func chunkTextSemantic(text string) []string {
 	// Normalize line endings
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
-	// Split by double newline (paragraphs)
-	paragraphs := strings.Split(text, "\n\n")
-
-	var chunks []string
-	var current strings.Builder
-
-	for _, p := range paragraphs {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-
-		// If current buffer is empty, start a new chunk
-		if current.Len() == 0 {
-			current.WriteString(p)
-			continue
-		}
-
-		// If current chunk is still short, append paragraph
-		if current.Len() < minChunkSize {
-			current.WriteString("\n\n")
-			current.WriteString(p)
-			continue
-		}
-
-		// Current chunk is long enough, flush it
-		chunks = append(chunks, current.String())
-		current.Reset()
-		current.WriteString(p)
-	}
-
-	// Flush the last chunk
-	if current.Len() > 0 {
-		chunks = append(chunks, current.String())
-	}
-
-	// If no chunks were produced (e.g. empty input), return a single empty chunk
-	if len(chunks) == 0 {
+	if strings.TrimSpace(text) == "" {
 		return []string{text}
 	}
 
+	// Collect all sentences with their byte spans
+	type sentence struct {
+		start, end int
+		text       string
+	}
+	var sentences []sentence
+
+	it := &sentenceIter{text: text}
+	for {
+		start, end, done := it.next()
+		if done {
+			break
+		}
+		s := strings.TrimSpace(text[start:end])
+		if s == "" {
+			continue
+		}
+		sentences = append(sentences, sentence{start: start, end: end, text: s})
+	}
+
+	// If by some quirk we got zero, fall back to line-based splitting
+	if len(sentences) == 0 {
+		lines := strings.Split(text, "\n")
+		for _, l := range lines {
+			l = strings.TrimSpace(l)
+			if l != "" {
+				sentences = append(sentences, sentence{text: l})
+			}
+		}
+	}
+
+	if len(sentences) == 0 {
+		return []string{text}
+	}
+	// Single sentence — return as-is
+	if len(sentences) <= overlapSentences+1 {
+		return []string{sentences[0].text}
+	}
+
+	var chunks []string
+	startIdx := 0
+
+	for startIdx < len(sentences) {
+		endIdx := startIdx
+		charCount := 0
+
+		// Accumulate sentences until we hit targetChunkSize,
+		// or run out of sentences.
+		for endIdx < len(sentences) {
+			s := sentences[endIdx]
+			sLen := utf8.RuneCountInString(s.text)
+
+			// If adding this sentence would exceed maxChunkSize,
+			// and we already have at least minChunkSize, stop.
+			if charCount > 0 && charCount+sLen > maxChunkSize {
+				break
+			}
+
+			charCount += sLen
+			endIdx++
+
+			// If we've reached or exceeded target, stop accumulating.
+			if charCount >= targetChunkSize {
+				break
+			}
+		}
+
+		// Build chunk text from sentences [startIdx, endIdx)
+		var chunkBuf strings.Builder
+		for i := startIdx; i < endIdx; i++ {
+			if chunkBuf.Len() > 0 {
+				chunkBuf.WriteByte(' ')
+			}
+			chunkBuf.WriteString(sentences[i].text)
+		}
+		chunk := chunkBuf.String()
+
+		// If chunk is too small and there are more sentences, merge with next
+		if utf8.RuneCountInString(chunk) < minChunkSize && endIdx < len(sentences) {
+			for endIdx < len(sentences) && utf8.RuneCountInString(chunk) < minChunkSize {
+				s := sentences[endIdx]
+				chunkBuf.WriteByte(' ')
+				chunkBuf.WriteString(s.text)
+				endIdx++
+			}
+			chunk = chunkBuf.String()
+		}
+
+		// Count actual sentences used after potential extension
+		usedSentences := endIdx - startIdx
+
+		if usedSentences <= overlapSentences {
+			// No overlap possible — just emit and move on
+			chunks = append(chunks, chunk)
+			startIdx = endIdx
+			continue
+		}
+
+		// Add overlap: rewind start by overlapSentences for next chunk
+		chunks = append(chunks, chunk)
+		startIdx = endIdx - overlapSentences
+	}
+
+	// Deduplicate consecutive chunks that are identical (can happen with
+	// tiny documents where overlap rewinds too far).
+	if len(chunks) > 1 {
+		deduped := []string{chunks[0]}
+		for i := 1; i < len(chunks); i++ {
+			if chunks[i] != chunks[i-1] {
+				deduped = append(deduped, chunks[i])
+			}
+		}
+		chunks = deduped
+	}
+
 	return chunks
+}
+
+// chunkString splits a string into overlapping windows of n characters,
+// stepping by step characters. Returns empty slice for invalid inputs.
+func chunkString(s string, n, step int) []string {
+	if n <= 0 || step <= 0 || s == "" {
+		return []string{}
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
+		return []string{s}
+	}
+	var result []string
+	for i := 0; i < len(runes); i += step {
+		end := i + n
+		if end > len(runes) {
+			end = len(runes)
+		}
+		result = append(result, string(runes[i:end]))
+	}
+	return result
+}
+
+// countSentences counts the approximate number of sentences in text.
+func countSentences(text string) int {
+	count := 0
+	it := &sentenceIter{text: text}
+	for {
+		_, _, done := it.next()
+		if done {
+			break
+		}
+		count++
+	}
+	if count == 0 && strings.TrimSpace(text) != "" {
+		return 1
+	}
+	return count
+}
+
+// sentenceLengths returns the rune lengths of each sentence.
+func sentenceLengths(text string) []int {
+	var lengths []int
+	// Collect all sentences
+	type sentence struct {
+		text string
+	}
+	var sentences []sentence
+	it := &sentenceIter{text: text}
+	for {
+		start, end, done := it.next()
+		if done {
+			break
+		}
+		s := strings.TrimSpace(text[start:end])
+		if s != "" {
+			sentences = append(sentences, sentence{text: s})
+		}
+	}
+	for _, s := range sentences {
+		lengths = append(lengths, utf8.RuneCountInString(s.text))
+	}
+	return lengths
+}
+
+// averageSentenceLength returns the mean sentence length in runes.
+func averageSentenceLength(text string) float64 {
+	lengths := sentenceLengths(text)
+	if len(lengths) == 0 {
+		return 0
+	}
+	sum := 0
+	for _, l := range lengths {
+		sum += l
+	}
+	return float64(sum) / float64(len(lengths))
+}
+
+// stddevSentenceLength returns the standard deviation of sentence lengths.
+func stddevSentenceLength(text string) float64 {
+	lengths := sentenceLengths(text)
+	if len(lengths) == 0 {
+		return 0
+	}
+	avg := float64(0)
+	for _, l := range lengths {
+		avg += float64(l)
+	}
+	avg /= float64(len(lengths))
+
+	variance := float64(0)
+	for _, l := range lengths {
+		d := float64(l) - avg
+		variance += d * d
+	}
+	variance /= float64(len(lengths))
+	return math.Sqrt(variance)
+}
+
+// chunkText wraps chunkTextSemantic for backward compatibility.
+// Deprecated: use chunkTextSemantic directly.
+func chunkText(text string) []string {
+	return chunkTextSemantic(text)
 }

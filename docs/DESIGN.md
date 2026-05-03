@@ -29,9 +29,11 @@
 - Creates `keyvalembd` instance and registers tools.
 
 ### 2. Chunker (`chunker.go`)
-- `splitIntoParagraphs()` — splits text by blank lines.
-- `splitLongParagraph()` — splits paragraphs > 200 chars by sentences.
-- `makeChunks()` — combines paragraphs into chunks of min 100 chars.
+- **Sentence-based splitting** — splits text at sentence boundaries (. ! ? … followed by whitespace/end).
+- **Semantic chunking** — accumulates sentences until target size (~1200 chars), with a minimum of 500 chars and hard max of 2000 chars.
+- **Overlap** — preserves the last 2 sentences from each chunk as overlap into the next chunk for context continuity.
+- **Deduplication** — removes consecutive identical chunks that can occur with tiny documents.
+- **Helper functions** — `countSentences`, `sentenceLengths`, `averageSentenceLength`, `stddevSentenceLength` for metrics and debugging.
 
 ### 3. Tools (`tools.go`)
 - **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
@@ -75,7 +77,11 @@ Answer text returned to user
 | LLM | Ollama qwen2.5-7B | Local, fast, good quality |
 | Protocol | MCP JSON-RPC | Standard protocol for AI assistants |
 | Streaming | Always `stream: true` | Ollama may return NDJSON even with `stream: false` |
-| Chunk min size | 100 chars | Avoid trivial chunks |
+| Chunk strategy | Sentence-based semantic | Splits by sentence boundaries, overlap preserves context |
+| Chunk min size | 500 chars | Avoid trivial chunks, each chunk has enough semantic weight |
+| Chunk target size | 1200 chars | Optimal for embedding models and LLM context windows |
+| Chunk max size | 2000 chars | Hard safety limit to prevent oversized chunks |
+| Chunk overlap | 2 sentences | Carried from previous chunk for context continuity |
 | Max chunks per doc | 1000 | Safety limit |
 
 ## Tool Specifications

@@ -1,6 +1,6 @@
 # rag-mcp — Status
 
-## Project Status: ✅ Active (v0.2.0)
+## Project Status: ✅ Active (v0.3.0)
 
 ## Milestones
 
@@ -14,12 +14,14 @@
 | 2026-05-02 | Docs: CONTEXT.md, DESIGN.md, STATUS.md | ✅ Done |
 | 2026-05-03 | rag-query progress notifications | ✅ Done |
 | 2026-05-03 | file_path, directory, URL ingest — 6 tools total | ✅ Done |
+| 2026-05-03 | Semantic chunking — sentence split, overlap, min 500 chars | ✅ Done |
 
 ## Current State
 
 - **6 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_query`, `rag_list`, `rag_delete` — all functional
 - **LLM**: Uses Ollama `/api/chat` with `stream: true` for reliable NDJSON parsing
 - **Storage**: keyvalembd (libSQL + vector embeddings)
+- **Chunker**: Sentence-based semantic chunking with overlap (2 sentences) and target size 1200 chars (min 500, max 2000)
 - **No known issues**
 
 ## Test Results
@@ -40,4 +42,5 @@
 
 - [ ] Register rag-mcp as MCP server in Cline config
 - [ ] Integrate with Cooksy knowledge base ingestion
-- [ ] Improve chunk quality (semantic chunking)
+- [ ] Add `rag_list` tool to list all documents
+- [ ] Add document deletion by specific chunk
