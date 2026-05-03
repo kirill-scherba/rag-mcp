@@ -99,7 +99,7 @@ Available tools:
 	)
 
 	// Register all tools
-	s.AddTools(tools(kv)...)
+	s.AddTools(tools(s, kv)...)
 
 	log.Printf("✅ Registered 3 tools")
 

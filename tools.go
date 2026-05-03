@@ -34,10 +34,10 @@ type ragResult struct {
 var mu sync.Mutex
 
 // tools returns all MCP tools for rag-mcp.
-func tools(kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
+func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
 	return []server.ServerTool{
 		ragIngestTool(kv),
-		ragQueryTool(kv),
+		ragQueryTool(srv, kv),
 		ragDeleteTool(kv),
 		ragListTool(kv),
 	}
@@ -120,7 +120,9 @@ and stores them for semantic search.`),
 // ─── rag_query ───────────────────────────────────────────────────────────────────
 
 // ragQueryTool answers a question using RAG: semantic search + LLM generation.
-func ragQueryTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+// Sends progress notifications to the client so the user can see real-time
+// status updates via the MCP progress bar.
+func ragQueryTool(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) server.ServerTool {
 	opt := mcp.NewTool("rag_query",
 		mcp.WithDescription(`Answer a question using the RAG knowledge base.
 Performs semantic search across ingested documents and generates
@@ -156,16 +158,41 @@ an answer using the LLM.`),
 				topK = 5
 			}
 
-			// Semantic search for relevant chunks
+			// Extract progressToken from request metadata (if provided by client)
+			var progressToken mcp.ProgressToken
+			if request.Params.Meta != nil {
+				progressToken = request.Params.Meta.ProgressToken
+			}
+
+			// Helper to send a progress notification (fire-and-forget, errors ignored).
+			sendProgress := func(progress, total float64, message string) {
+				if srv == nil || progressToken == nil {
+					return
+				}
+				params := map[string]any{
+					"progressToken": progressToken,
+					"progress":      progress,
+					"total":         total,
+					"message":       message,
+				}
+				_ = srv.SendNotificationToClient(ctx, "notifications/progress", params)
+			}
+
+			// Stage 1: Semantic search
+			sendProgress(0, 100, "🔍 Searching knowledge base...")
 			searchResults, err := kv.SearchSemantic(question, topK)
 			if err != nil {
+				sendProgress(100, 100, "❌ Search failed")
 				return mcp.NewToolResultText(fmt.Sprintf(
 					"Search error: %v\nTip: Ensure Ollama is running and has the embedding model installed.", err)), nil
 			}
 
 			if len(searchResults) == 0 {
+				sendProgress(100, 100, "❌ No relevant documents found")
 				return mcp.NewToolResultText("No relevant documents found in the knowledge base to answer the question."), nil
 			}
+
+			sendProgress(30, 100, fmt.Sprintf("📄 Found %d relevant fragments, generating answer...", len(searchResults)))
 
 			// Convert to ragResult format using search result fields
 			var chunks []ragResult
@@ -180,25 +207,49 @@ an answer using the LLM.`),
 			// Format a summary of found chunks for the response
 			var chunkSummary []string
 			for _, ch := range chunks {
-				truncated := ch.Text
+				truncated := []rune(ch.Text)
 				if len(truncated) > 120 {
-					truncated = truncated[:120] + "..."
+					truncated = truncated[:120]
 				}
 				chunkSummary = append(chunkSummary, fmt.Sprintf(
-					"- [%.4f] %s", ch.Score, truncated))
+					"- [%.4f] %s", ch.Score, string(truncated)+"..."))
 			}
 
 			// Build prompt and generate answer
 			messages, err := buildRAGPrompt(chunks, question)
 			if err != nil {
+				sendProgress(100, 100, "❌ Failed to build prompt")
 				return mcp.NewToolResultText(fmt.Sprintf(
 					"Error building prompt: %v", err)), nil
 			}
-			answer, err := generateAnswer(messages)
+
+			// Progress callback: sends progress updates with a rolling average
+			// of message tokens so the user can see the answer being built.
+			const totalProgress = 100.0
+			const progressStart = 30.0
+			const progressEnd = 95.0
+
+			tokenCount := 0
+			progressFn := func(token string) {
+				tokenCount++
+				// Map token count to progress range [30..95]
+				// Use a logarithmic-like scale: first tokens advance faster
+				p := progressStart + (progressEnd-progressStart)*
+					float64(tokenCount)/float64(tokenCount+50)
+				if p > progressEnd {
+					p = progressEnd
+				}
+				sendProgress(p, totalProgress, fmt.Sprintf("💬 Generating answer... (token %d)", tokenCount))
+			}
+
+			answer, err := generateAnswerStream(messages, progressFn)
 			if err != nil {
+				sendProgress(100, 100, "❌ Answer generation failed")
 				return mcp.NewToolResultText(fmt.Sprintf(
 					"Error generating answer: %v", err)), nil
 			}
+
+			sendProgress(100, 100, "✅ Answer generated")
 
 			// Build result
 			result := fmt.Sprintf("Question: %s\n\n", question)

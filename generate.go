@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -17,7 +18,7 @@ import (
 
 // Default LLM models and Ollama settings.
 const (
-	defaultLLMModel = "gemma3:4b" // "qwen2.5:1.5b"
+	defaultLLMModel = "phi4-mini" // "gemma3:4b" // "qwen2.5:1.5b"
 	ollamaBaseURL   = "http://localhost:11434"
 	generateTimeout = 120 * time.Second
 )
@@ -123,8 +124,13 @@ func parseOllamaResponse(data []byte) (string, error) {
 	return "", fmt.Errorf("failed to parse Ollama response (body: %s)", string(data))
 }
 
-// generateAnswer sends a chat request to Ollama and returns the generated answer.
-func generateAnswer(messages []OllamaChatMessage) (string, error) {
+// TokenProgressFn is called with each token as it arrives from the LLM stream.
+type TokenProgressFn func(token string)
+
+// generateAnswerStream sends a streaming chat request to Ollama, calls
+// progressFn for each token as it arrives, and returns the full answer.
+// If progressFn is nil, tokens are accumulated silently.
+func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgressFn) (string, error) {
 	baseURL := os.Getenv("OLLAMA_BASE_URL")
 	if baseURL == "" {
 		baseURL = ollamaBaseURL
@@ -138,11 +144,11 @@ func generateAnswer(messages []OllamaChatMessage) (string, error) {
 		model = defaultLLMModel
 	}
 
-	// Some Ollama models always stream, so we handle both streaming and non-streaming.
+	// Enable streaming so tokens arrive as they are generated
 	reqBody := OllamaChatRequest{
 		Model:    model,
 		Messages: messages,
-		Stream:   boolPtr(false),
+		Stream:   boolPtr(true),
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -161,10 +167,38 @@ func generateAnswer(messages []OllamaChatMessage) (string, error) {
 		return "", fmt.Errorf("Ollama returned error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read Ollama response: %w", err)
+	// Stream NDJSON response line by line, write tokens to stderr
+	scanner := bufio.NewScanner(resp.Body)
+	var answer strings.Builder
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		var chunk OllamaChatResponse
+		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
+			continue // skip malformed lines
+		}
+
+		if chunk.Message != nil {
+			token := chunk.Message.Content
+			if progressFn != nil {
+				progressFn(token)
+			}
+			// Stream token to stderr so user sees live answer in terminal
+			fmt.Fprintf(os.Stderr, "%s", token)
+			answer.WriteString(token)
+		}
+
+		if chunk.Done {
+			break
+		}
 	}
 
-	return parseOllamaResponse(data)
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading Ollama stream: %w", err)
+	}
+
+	return strings.TrimSpace(answer.String()), nil
 }

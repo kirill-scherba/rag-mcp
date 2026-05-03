@@ -180,9 +180,9 @@ architecture with Go backend services communicating via gRPC.`
 		t.Fatalf("buildRAGPrompt: %v", err)
 	}
 
-	answer, err := generateAnswer(messages)
+	answer, err := generateAnswerStream(messages, nil)
 	if err != nil {
-		t.Fatalf("generateAnswer: %v", err)
+		t.Fatalf("generateAnswerStream: %v", err)
 	}
 	t.Logf("   Answer: %s", answer)
 
