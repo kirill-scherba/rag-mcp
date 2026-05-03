@@ -83,7 +83,7 @@ func main() {
 	// Create MCP server
 	s := server.NewMCPServer(
 		"rag-mcp",
-		"0.1.0",
+		"0.2.0",
 		server.WithInstructions(`RAG MCP — Retrieval-Augmented Generation knowledge base.
 
 Ingest documents, then ask questions. The system will:
@@ -93,15 +93,18 @@ Ingest documents, then ask questions. The system will:
 4. On query: find relevant chunks + generate answer via LLM
 
 Available tools:
-- rag_ingest:  Ingest a document (chunks, embeds, and stores text for search)
-- rag_query:   Ask a question (semantic search + LLM answer generation)
-- rag_delete:  Delete a document and all its chunks from the knowledge base`),
+- rag_ingest:           Ingest a document (by text or file_path)
+- rag_ingest_directory: Ingest all documents from a directory
+- rag_ingest_url:       Fetch a URL and ingest its content
+- rag_query:            Ask a question (semantic search + LLM answer)
+- rag_list:             List stored documents
+- rag_delete:           Delete a document and all its chunks`),
 	)
 
 	// Register all tools
 	s.AddTools(tools(s, kv)...)
 
-	log.Printf("✅ Registered 3 tools")
+	log.Printf("✅ Registered 6 tools")
 
 	// Start the server over stdin/stdout (JSON-RPC 2.0)
 	if err := server.ServeStdio(s); err != nil {

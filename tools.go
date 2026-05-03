@@ -9,6 +9,11 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +42,8 @@ var mu sync.Mutex
 func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
 	return []server.ServerTool{
 		ragIngestTool(kv),
+		ragIngestDirectoryTool(kv),
+		ragIngestUrlTool(kv),
 		ragQueryTool(srv, kv),
 		ragDeleteTool(kv),
 		ragListTool(kv),
@@ -46,18 +53,22 @@ func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTo
 // ─── rag_ingest ──────────────────────────────────────────────────────────────────
 
 // ragIngestTool ingests (saves) a document: chunks text, embeds, stores.
+// Provide either 'text' (inline content) or 'file_path' (path to file on disk).
 func ragIngestTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
 	opt := mcp.NewTool("rag_ingest",
 		mcp.WithDescription(`Ingest a document into the RAG knowledge base.
 Splits the text into chunks, generates embeddings for each chunk,
-and stores them for semantic search.`),
+and stores them for semantic search.
+Provide either 'text' (inline content) or 'file_path' (path to file on disk).`),
 		mcp.WithString("key",
 			mcp.Description("Document key (e.g. rag/docs/cooksy/architecture)"),
 			mcp.Required(),
 		),
 		mcp.WithString("text",
-			mcp.Description("Full document text to ingest"),
-			mcp.Required(),
+			mcp.Description("Full document text to ingest (mutually exclusive with file_path)"),
+		),
+		mcp.WithString("file_path",
+			mcp.Description("Path to a file to read and ingest (mutually exclusive with text)"),
 		),
 	)
 
@@ -68,10 +79,22 @@ and stores them for semantic search.`),
 			defer mu.Unlock()
 			args := request.GetArguments()
 			key, _ := args["key"].(string)
-			text, _ := args["text"].(string)
+
+			// Resolve text: file_path takes precedence over inline text
+			var text string
+			if filePath, ok := args["file_path"].(string); ok && filePath != "" {
+				data, err := os.ReadFile(filePath)
+				if err != nil {
+					return mcp.NewToolResultText(fmt.Sprintf(
+						"Error reading file %q: %v", filePath, err)), nil
+				}
+				text = string(data)
+			} else if t, ok := args["text"].(string); ok {
+				text = t
+			}
 
 			if key == "" || text == "" {
-				return mcp.NewToolResultText("Error: key and text are required"), nil
+				return mcp.NewToolResultText("Error: key and either text or file_path are required"), nil
 			}
 
 			// Chunk the text
@@ -111,6 +134,228 @@ and stores them for semantic search.`),
 			}
 
 			out := fmt.Sprintf("Ingested %d chunks:\n", len(chunks))
+			out += strings.Join(results, "\n")
+			return mcp.NewToolResultText(out), nil
+		},
+	}
+}
+
+// ─── rag_ingest_directory ────────────────────────────────────────────────────────
+
+// ragIngestDirectoryTool ingests all files matching a pattern in a directory.
+func ragIngestDirectoryTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+	opt := mcp.NewTool("rag_ingest_directory",
+		mcp.WithDescription(`Ingest all documents from a directory into the RAG knowledge base.
+Scans the directory for matching files (default: *.md,*.txt) and ingests each one.
+Document key is '<key_prefix>/<filename_without_ext>'.`),
+		mcp.WithString("key_prefix",
+			mcp.Description("Prefix for document keys (e.g. rag/docs/cooksy)"),
+			mcp.Required(),
+		),
+		mcp.WithString("dir_path",
+			mcp.Description("Path to directory containing documents to ingest"),
+			mcp.Required(),
+		),
+		mcp.WithString("pattern",
+			mcp.Description("Glob pattern for files (default: '*.md,*.txt'). Comma-separated for multiple patterns."),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: opt,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			args := request.GetArguments()
+			keyPrefix, _ := args["key_prefix"].(string)
+			dirPath, _ := args["dir_path"].(string)
+			pattern, _ := args["pattern"].(string)
+
+			if keyPrefix == "" || dirPath == "" {
+				return mcp.NewToolResultText("Error: key_prefix and dir_path are required"), nil
+			}
+
+			// Default patterns if not specified
+			if pattern == "" {
+				pattern = "*.md,*.txt"
+			}
+			patterns := strings.Split(pattern, ",")
+			for i := range patterns {
+				patterns[i] = strings.TrimSpace(patterns[i])
+			}
+
+			// Collect matching files
+			var files []string
+			for _, p := range patterns {
+				matches, err := filepath.Glob(filepath.Join(dirPath, p))
+				if err != nil {
+					return mcp.NewToolResultText(fmt.Sprintf(
+						"Error matching pattern %q: %v", p, err)), nil
+				}
+				files = append(files, matches...)
+			}
+
+			if len(files) == 0 {
+				return mcp.NewToolResultText(fmt.Sprintf(
+					"No files matching '%s' found in %s", pattern, dirPath)), nil
+			}
+
+			// Ingest each file
+			var fileResults []string
+			totalChunks := 0
+			for _, filePath := range files {
+				// Read file
+				data, err := os.ReadFile(filePath)
+				if err != nil {
+					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: %v", filePath, err))
+					continue
+				}
+
+				// Generate document key from filename (without extension)
+				baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+				docKey := keyPrefix + "/" + baseName
+
+				// Chunk the text
+				chunks := chunkText(string(data))
+				if len(chunks) == 0 {
+					fileResults = append(fileResults, fmt.Sprintf("  ⚠️  %s: no chunks generated", filePath))
+					continue
+				}
+
+				// Store each chunk
+				for i, chunk := range chunks {
+					chunkKey := fmt.Sprintf("%s/chunk/%04d", docKey, i)
+					checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(chunk)))
+					val := map[string]interface{}{
+						"index":    i,
+						"total":    len(chunks),
+						"checksum": checksum,
+						"text":     chunk,
+						"doc_key":  docKey,
+						"stored":   time.Now().UTC().Format(time.RFC3339),
+					}
+					valJSON, _ := json.Marshal(val)
+					if _, err := kv.SetWithEmbedding(chunkKey, valJSON, chunk); err != nil {
+						fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: chunk %d error: %v", filePath, i+1, err))
+						continue
+					}
+				}
+
+				totalChunks += len(chunks)
+				fileResults = append(fileResults, fmt.Sprintf("  ✅ %s → %s (%d chunks)", filePath, docKey, len(chunks)))
+			}
+
+			out := fmt.Sprintf("Ingested %d files (%d total chunks):\n", len(files), totalChunks)
+			out += strings.Join(fileResults, "\n")
+			return mcp.NewToolResultText(out), nil
+		},
+	}
+}
+
+// ─── rag_ingest_url ──────────────────────────────────────────────────────────────
+
+// ragIngestUrlTool fetches a URL and ingests its content as a document.
+func ragIngestUrlTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+	opt := mcp.NewTool("rag_ingest_url",
+		mcp.WithDescription(`Fetch a URL and ingest its content into the RAG knowledge base.
+Downloads the content via HTTP GET, chunks it, generates embeddings,
+and stores for semantic search.
+If key is empty, auto-generates from the URL path.`),
+		mcp.WithString("key",
+			mcp.Description("Document key (e.g. rag/docs/cooksy/architecture). Auto-generated from URL if empty."),
+		),
+		mcp.WithString("url",
+			mcp.Description("URL to fetch and ingest"),
+			mcp.Required(),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: opt,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			args := request.GetArguments()
+			docKey, _ := args["key"].(string)
+			urlStr, _ := args["url"].(string)
+
+			if urlStr == "" {
+				return mcp.NewToolResultText("Error: url is required"), nil
+			}
+
+			// Auto-generate key from URL if not provided
+			if docKey == "" {
+				parsedURL, err := url.Parse(urlStr)
+				if err != nil {
+					return mcp.NewToolResultText(fmt.Sprintf(
+						"Error parsing URL %q: %v", urlStr, err)), nil
+				}
+				// Use host + path as key
+				path := strings.TrimSuffix(parsedURL.Path, filepath.Ext(parsedURL.Path))
+				if path == "" || path == "/" {
+					path = "/index"
+				}
+				docKey = fmt.Sprintf("rag/web/%s%s", parsedURL.Host, path)
+			}
+
+			// Fetch the URL
+			client := &http.Client{Timeout: 30 * time.Second}
+			resp, err := client.Get(urlStr)
+			if err != nil {
+				return mcp.NewToolResultText(fmt.Sprintf(
+					"Error fetching URL %q: %v", urlStr, err)), nil
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return mcp.NewToolResultText(fmt.Sprintf(
+					"Error fetching URL %q: HTTP %d", urlStr, resp.StatusCode)), nil
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return mcp.NewToolResultText(fmt.Sprintf(
+					"Error reading response body: %v", err)), nil
+			}
+
+			text := string(body)
+			if len(text) == 0 {
+				return mcp.NewToolResultText(fmt.Sprintf(
+					"Error: empty content from %q", urlStr)), nil
+			}
+
+			// Chunk the text
+			chunks := chunkText(text)
+			if len(chunks) == 0 {
+				return mcp.NewToolResultText(fmt.Sprintf(
+					"Error: no chunks generated from %q", urlStr)), nil
+			}
+
+			// Store each chunk
+			var results []string
+			for i, chunk := range chunks {
+				chunkKey := fmt.Sprintf("%s/chunk/%04d", docKey, i)
+				checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(chunk)))
+				val := map[string]interface{}{
+					"index":    i,
+					"total":    len(chunks),
+					"checksum": checksum,
+					"text":     chunk,
+					"doc_key":  docKey,
+					"source":   urlStr,
+					"stored":   time.Now().UTC().Format(time.RFC3339),
+				}
+				valJSON, _ := json.Marshal(val)
+				info, err := kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+				if err != nil {
+					return mcp.NewToolResultText(fmt.Sprintf(
+						"Error storing chunk %d/%d: %v", i+1, len(chunks), err)), nil
+				}
+				results = append(results, fmt.Sprintf(
+					"  chunk %d/%d: key=%s, size=%d", i+1, len(chunks), info.Checksum, info.ContentLength))
+			}
+
+			out := fmt.Sprintf("Ingested %q as %s (%d chunks):\n", urlStr, docKey, len(chunks))
 			out += strings.Join(results, "\n")
 			return mcp.NewToolResultText(out), nil
 		},

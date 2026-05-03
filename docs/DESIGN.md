@@ -34,9 +34,12 @@
 - `makeChunks()` — combines paragraphs into chunks of min 100 chars.
 
 ### 3. Tools (`tools.go`)
-- **`rag_ingest`**: Accepts `id` (document key) and `text` (content). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
-- **`rag_query`**: Accepts `query` text. Performs semantic search on stored chunks, builds RAG prompt, calls LLM. Returns combined answer.
-- **`rag_delete`**: Accepts `id` (document key prefix). Lists all chunks with that prefix and deletes them from keyvalembd. Returns deleted count.
+- **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
+- **`rag_ingest_directory`**: Accepts `key_prefix`, `dir_path`, and optional `pattern` (default `*.md,*.txt`). Scans directory, reads each matching file, ingests with key `<key_prefix>/<filename>`.
+- **`rag_ingest_url`**: Accepts `url` (required) and optional `key`. Fetches URL via HTTP GET, chunks and stores content. Auto-generates key from host+path if not provided.
+- **`rag_query`**: Accepts `question` text. Performs semantic search on stored chunks, builds RAG prompt, calls LLM. Returns combined answer.
+- **`rag_list`**: Lists document keys or chunks in the knowledge base.
+- **`rag_delete`**: Accepts `key` (document key prefix). Lists all chunks with that prefix and deletes them from keyvalembd. Returns deleted count.
 
 ### 4. LLM Generation (`generate.go`)
 - `buildRAGPrompt()` — formats context chunks + system instruction + user question into Ollama chat messages.
@@ -84,10 +87,42 @@ Answer text returned to user
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id":  { "type": "string", "description": "Document key/prefix (e.g. 'cooksy/architecture')" },
-      "text": { "type": "string", "description": "Document content to ingest" }
+      "key":       { "type": "string", "description": "Document key/prefix (e.g. 'cooksy/architecture')" },
+      "text":      { "type": "string", "description": "Document content to ingest (mutually exclusive with file_path)" },
+      "file_path": { "type": "string", "description": "Path to file on disk to ingest (mutually exclusive with text)" }
     },
-    "required": ["id", "text"]
+    "required": ["key"]
+  }
+}
+```
+
+### rag_ingest_directory
+```json
+{
+  "name": "rag_ingest_directory",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "key_prefix": { "type": "string", "description": "Prefix for document keys (e.g. rag/docs/cooksy)" },
+      "dir_path":   { "type": "string", "description": "Path to directory containing documents" },
+      "pattern":    { "type": "string", "description": "Glob pattern (default: *.md,*.txt)" }
+    },
+    "required": ["key_prefix", "dir_path"]
+  }
+}
+```
+
+### rag_ingest_url
+```json
+{
+  "name": "rag_ingest_url",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "key": { "type": "string", "description": "Document key (auto-generated from URL if empty)" },
+      "url": { "type": "string", "description": "URL to fetch and ingest" }
+    },
+    "required": ["url"]
   }
 }
 ```
@@ -99,10 +134,23 @@ Answer text returned to user
   "inputSchema": {
     "type": "object",
     "properties": {
-      "query": { "type": "string", "description": "Natural language query" },
-      "limit": { "type": "integer", "description": "Max chunks to retrieve (default 5)", "default": 5 }
+      "question": { "type": "string", "description": "Natural language query" },
+      "top_k":    { "type": "number", "description": "Max chunks to retrieve (default 5, max 20)", "default": 5 }
     },
-    "required": ["query"]
+    "required": ["question"]
+  }
+}
+```
+
+### rag_list
+```json
+{
+  "name": "rag_list",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "key": { "type": "string", "description": "Optional key prefix to list (lists all top-level keys if omitted)" }
+    }
   }
 }
 ```
@@ -114,8 +162,8 @@ Answer text returned to user
   "inputSchema": {
     "type": "object",
     "properties": {
-      "id": { "type": "string", "description": "Document key/prefix to delete" }
+      "key": { "type": "string", "description": "Document key/prefix to delete" }
     },
-    "required": ["id"]
+    "required": ["key"]
   }
 }

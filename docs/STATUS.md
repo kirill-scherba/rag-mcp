@@ -1,6 +1,6 @@
 # rag-mcp — Status
 
-## Project Status: ✅ Active (v0.1.0)
+## Project Status: ✅ Active (v0.2.0)
 
 ## Milestones
 
@@ -12,10 +12,12 @@
 | 2026-05-02 | Switch to Ollama /api/chat (fix answer truncation) | ✅ Done |
 | 2026-05-02 | Smoke test: ingest → query → LLM generation | ✅ Done |
 | 2026-05-02 | Docs: CONTEXT.md, DESIGN.md, STATUS.md | ✅ Done |
+| 2026-05-03 | rag-query progress notifications | ✅ Done |
+| 2026-05-03 | file_path, directory, URL ingest — 6 tools total | ✅ Done |
 
 ## Current State
 
-- **3 tools**: `rag_ingest`, `rag_query`, `rag_delete` — all functional
+- **6 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_query`, `rag_list`, `rag_delete` — all functional
 - **LLM**: Uses Ollama `/api/chat` with `stream: true` for reliable NDJSON parsing
 - **Storage**: keyvalembd (libSQL + vector embeddings)
 - **No known issues**
@@ -38,6 +40,4 @@
 
 - [ ] Register rag-mcp as MCP server in Cline config
 - [ ] Integrate with Cooksy knowledge base ingestion
-- [ ] Add `rag_list` tool to list all documents
-- [ ] Add document deletion by specific chunk
 - [ ] Improve chunk quality (semantic chunking)
