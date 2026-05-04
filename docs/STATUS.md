@@ -5,7 +5,7 @@
 ## Milestones
 
 | Date | Milestone | Status |
-|------|-----------|--------|
+| ------------ | ----------- | -------- |
 | 2026-05-02 | Initial build — MCP server with ingest + query + delete | ✅ Done |
 | 2026-05-02 | Smoke test: tools/list | ✅ Done |
 | 2026-05-02 | Fix race condition (sync.Mutex) | ✅ Done |
@@ -32,7 +32,7 @@
 
 ## Test Results
 
-```
+```txt
 === RUN   TestSmoke
 ✅ Embeddings ready (model: embeddinggemma:latest)
 ✅ keyvalembd ready
@@ -46,10 +46,10 @@
 
 ### rag-cli Tests
 
-```
-$ ./rag-cli --help         # All commands displayed
-$ ./rag-cli list           # Listed 2 entries (rag/, sqlh/)
-$ ./rag-cli query "..."    # Connected to rag-mcp, streamed tokens, returned answer
+```bash
+./rag-cli --help         # All commands displayed
+./rag-cli list           # Listed 2 entries (rag/, sqlh/)
+./rag-cli query "..."    # Connected to rag-mcp, streamed tokens, returned answer
 ```
 
 ## Next Steps
