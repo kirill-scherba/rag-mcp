@@ -379,6 +379,9 @@ an answer using the LLM.`),
 		mcp.WithNumber("top_k",
 			mcp.Description("Number of context fragments to retrieve (default: 5, max: 20)"),
 		),
+		mcp.WithString("style",
+			mcp.Description("Answer style: 'strict' (default) for exact copy-paste, 'creative' for free-form explanation"),
+		),
 	)
 
 	return server.ServerTool{
@@ -403,6 +406,34 @@ an answer using the LLM.`),
 				topK = 5
 			}
 
+			// Detect client mode:
+			//   auto   → use stream mode if client supports progress tokens (Cline/IDE)
+			//   stream → always stream via progress notifications
+			//   batch  → return full answer in CallToolResult
+			//
+			// Progress token presence from the client is the key signal.
+			hasProgressToken := request.Params.Meta != nil && request.Params.Meta.ProgressToken != nil
+
+			useStream := false
+			switch clientMode {
+			case ClientModeStream:
+				useStream = true
+			case ClientModeAuto:
+				useStream = hasProgressToken
+			// ClientModeBatch: useStream stays false
+			}
+
+			// Derive and store decision for later use
+			isStreamMode := useStream
+
+			// When streaming via progress notifications, suppress stderr output
+			// to avoid duplicate tokens appearing in the CLI/IDE terminal.
+			if isStreamMode {
+				streamToStderr = false
+			} else {
+				streamToStderr = true
+			}
+
 			// Extract progressToken from request metadata (if provided by client)
 			var progressToken mcp.ProgressToken
 			if request.Params.Meta != nil {
@@ -410,6 +441,8 @@ an answer using the LLM.`),
 			}
 
 			// Helper to send a progress notification (fire-and-forget, errors ignored).
+			// In stream mode, tokens are sent as progress messages with a special
+			// "answer_" prefix so the CLI client can distinguish them.
 			sendProgress := func(progress, total float64, message string) {
 				if srv == nil || progressToken == nil {
 					return
@@ -460,8 +493,14 @@ an answer using the LLM.`),
 					"- [%.4f] %s", ch.Score, string(truncated)+"..."))
 			}
 
+			// Read style parameter (default: strict)
+			style, _ := args["style"].(string)
+			if style != "creative" {
+				style = "strict"
+			}
+
 			// Build prompt and generate answer
-			messages, err := buildRAGPrompt(chunks, question)
+			messages, err := buildRAGPrompt(chunks, question, style)
 			if err != nil {
 				sendProgress(100, 100, "❌ Failed to build prompt")
 				return mcp.NewToolResultText(fmt.Sprintf(
@@ -470,10 +509,13 @@ an answer using the LLM.`),
 
 			// Progress callback: sends progress updates with a rolling average
 			// of message tokens so the user can see the answer being built.
+			// In stream mode, tokens are also sent via progress notifications
+			// with an "answer_" prefix so the CLI client can display them live.
 			const totalProgress = 100.0
 			const progressStart = 30.0
 			const progressEnd = 95.0
 
+			var answerBuf strings.Builder
 			tokenCount := 0
 			progressFn := func(token string) {
 				tokenCount++
@@ -484,10 +526,26 @@ an answer using the LLM.`),
 				if p > progressEnd {
 					p = progressEnd
 				}
-				sendProgress(p, totalProgress, fmt.Sprintf("💬 Generating answer... (token %d)", tokenCount))
+
+				if isStreamMode && progressToken != nil {
+					// In stream mode, send each token as a progress notification
+					// with the "answer_" prefix so the CLI client can display it.
+					answerBuf.WriteString(token)
+					sendProgress(p, totalProgress, fmt.Sprintf("answer_%s", token))
+				} else {
+					// In batch mode, just update progress status
+					sendProgress(p, totalProgress, fmt.Sprintf("💬 Generating answer... (token %d)", tokenCount))
+				}
 			}
 
 			answer, err := generateAnswerStream(messages, progressFn)
+			if isStreamMode {
+				// In stream mode, accumulate all tokens and use them as the answer
+				// (answer from generateAnswerStream is the same, but we also have answerBuf)
+				if answerBuf.Len() > 0 {
+					answer = answerBuf.String()
+				}
+			}
 			if err != nil {
 				sendProgress(100, 100, "❌ Answer generation failed")
 				return mcp.NewToolResultText(fmt.Sprintf(

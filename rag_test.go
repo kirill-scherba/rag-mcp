@@ -147,6 +147,7 @@ architecture with Go backend services communicating via gRPC.`
 	t.Log("🔍 Querying knowledge base...")
 	question := "What is Cooksy and what are its key features?"
 	question = "Что такое Cooksy и какие у него ключевые возможности?"
+	question = "как добавить строку в БД в go package 'kirill-scherba/sqlh'"
 	searchResults, err := kv.SearchSemantic(question, 3)
 	if err != nil {
 		t.Fatalf("SearchSemantic: %v", err)
@@ -175,7 +176,7 @@ architecture with Go backend services communicating via gRPC.`
 	}
 
 	t.Log("🤖 Generating answer via LLM...")
-	messages, err := buildRAGPrompt(chunksForPrompt, question)
+	messages, err := buildRAGPrompt(chunksForPrompt, question, "creative")
 	if err != nil {
 		t.Fatalf("buildRAGPrompt: %v", err)
 	}

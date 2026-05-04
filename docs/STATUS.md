@@ -15,10 +15,16 @@
 | 2026-05-03 | rag-query progress notifications | ✅ Done |
 | 2026-05-03 | file_path, directory, URL ingest — 6 tools total | ✅ Done |
 | 2026-05-03 | Semantic chunking — sentence split, overlap, min 500 chars | ✅ Done |
+| 2026-05-03 | rag-cli — standalone CLI with query/ingest/list/delete | ✅ Done |
 
 ## Current State
 
 - **6 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_query`, `rag_list`, `rag_delete` — all functional
+- **CLI client**: `rag-cli` — standalone binary using MCP stdio client (Cobra framework)
+  - `query` with real-time LLM token streaming to stderr
+  - `ingest` with subcommands: `text`, `file`, `dir`, `url`
+  - `list`, `delete`
+  - Auto-discovers `rag-mcp` binary (PATH, same dir, GOPATH/bin)
 - **LLM**: Uses Ollama `/api/chat` with `stream: true` for reliable NDJSON parsing
 - **Storage**: keyvalembd (libSQL + vector embeddings)
 - **Chunker**: Sentence-based semantic chunking with overlap (2 sentences) and target size 1200 chars (min 500, max 2000)
@@ -38,9 +44,19 @@
 --- PASS: TestSmoke (8.04s)
 ```
 
+### rag-cli Tests
+
+```
+$ ./rag-cli --help         # All commands displayed
+$ ./rag-cli list           # Listed 2 entries (rag/, sqlh/)
+$ ./rag-cli query "..."    # Connected to rag-mcp, streamed tokens, returned answer
+```
+
 ## Next Steps
 
 - [ ] Register rag-mcp as MCP server in Cline config
 - [ ] Integrate with Cooksy knowledge base ingestion
-- [ ] Add `rag_list` tool to list all documents
 - [ ] Add document deletion by specific chunk
+- [ ] Add `rag-cli` shell completion scripts
+- [ ] Add `rag-cli ingest batch` — bulk ingest from file list
+- [ ] Add `--format` flag to `list` (json, tree)

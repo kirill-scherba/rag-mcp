@@ -68,6 +68,64 @@ generateAnswer(messages) → Ollama /api/chat
 Answer text returned to user
 ```
 
+## CLI Client: rag-cli
+
+### Purpose
+
+`rag-cli` is a standalone CLI binary that communicates with the `rag-mcp` MCP server via JSON-RPC 2.0 over stdin/stdout. It provides a familiar command-line interface to the RAG knowledge base without needing an MCP-compatible AI assistant.
+
+### Architecture
+
+```
+┌──────────────┐    JSON-RPC 2.0    ┌──────────────┐
+│   rag-cli     │ ◄── stdin/stdout ──► │   rag-mcp     │
+│  (Cobra CLI)  │                     │  (MCP server) │
+└──────────────┘                     └──────┬───────┘
+                                            │
+                                            ▼
+                                  ┌─────────────────┐
+                                  │   keyvalembd     │
+                                  │  (libSQL + vec)  │
+                                  └─────────────────┘
+```
+
+### Implementation
+
+- **Location**: `cmd/rag-cli/`
+- **Framework**: `spf13/cobra` for CLI structure
+- **Client**: `mark3labs/mcp-go/client` — stdio MCP client to rag-mcp
+- **Auto-discovery**: Locates `rag-mcp` binary in PATH, same directory, or `$GOPATH/bin`
+- **Token streaming**: rag-mcp writes LLM tokens to stderr; rag-cli proxies this to user's stderr for real-time streaming feedback
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `rag-cli query <question>` | Semantic search + LLM answer (tokens streamed to stderr) |
+| `rag-cli ingest text` | Ingest inline text (argument or stdin via `-`) |
+| `rag-cli ingest file` | Ingest a file from disk |
+| `rag-cli ingest dir` | Ingest all docs from a directory |
+| `rag-cli ingest url` | Fetch URL and ingest content |
+| `rag-cli list [key]` | List document keys or chunks |
+| `rag-cli delete <key>` | Delete a document |
+
+### Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--db` | Override rag-mcp database path |
+| `-m, --model` | Override LLM model |
+
+### Build
+
+```bash
+go build -o rag-cli ./cmd/rag-cli/
+```
+
+Since rag-mcp must be available to spawn, either:
+- Build both and keep them in the same directory
+- Install rag-mcp to `$GOPATH/bin` or a PATH location
+
 ## Key Design Decisions
 
 | Decision | Choice | Rationale |
@@ -83,6 +141,9 @@ Answer text returned to user
 | Chunk max size | 2000 chars | Hard safety limit to prevent oversized chunks |
 | Chunk overlap | 2 sentences | Carried from previous chunk for context continuity |
 | Max chunks per doc | 1000 | Safety limit |
+| CLI framework | Cobra (spf13/cobra) | Standard Go CLI framework with subcommands |
+| MCP client library | mark3labs/mcp-go/client | Official Go MCP client with stdio transport |
+| Binary autodiscovery | PATH + same dir + GOPATH | Flexible deployment without configuration |
 
 ## Tool Specifications
 

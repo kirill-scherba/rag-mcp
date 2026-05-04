@@ -36,7 +36,7 @@
 - [Go](https://go.dev/dl/) 1.26+
 - [Ollama](https://ollama.com/) running locally with:
   - `embeddinggemma:latest` (or custom via `EMBEDDING_MODEL` env var)
-  - `gemma3:4b` (or custom via `LLM_MODEL` env var)
+  - `phi4-mini` (or custom via `LLM_MODEL` env var)
 
 ## Installation
 
@@ -71,7 +71,7 @@ Options:
 Environment variables:
   OLLAMA_BASE_URL     Ollama API URL (default: http://localhost:11434)
   EMBEDDING_MODEL     Embedding model (default: embeddinggemma:latest)
-  LLM_MODEL           LLM model for answer generation (default: gemma3:4b)
+  LLM_MODEL           LLM model for answer generation (default: phi4-mini)
 ```
 
 ### MCP Tools

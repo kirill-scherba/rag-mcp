@@ -27,14 +27,44 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// ClientMode controls how rag_query streams answer tokens.
+type ClientMode int
+
+const (
+	// ClientModeAuto detects the client automatically from ClientInfo.
+	ClientModeAuto ClientMode = iota
+	// ClientModeBatch returns the full answer in CallToolResult (default for CLI clients).
+	ClientModeBatch
+	// ClientModeStream sends answer tokens via progress notifications (default for Cline/IDE clients).
+	ClientModeStream
+)
+
+// clientMode holds the current client mode (set at startup, readable globally).
+var clientMode ClientMode
+
 func main() {
 	// Command line flags
 	dbPath := flag.String("db", "",
 		"Path to the database (default: ~/.config/rag-mcp/rag.db)")
 	model := flag.String("model", "",
-		"LLM model for answer generation (overrides LLM_MODEL env, default: gemma3:4b)")
+		"LLM model for answer generation (overrides LLM_MODEL env, default: phi4-mini)")
+	mode := flag.String("client-mode", "auto",
+		"Client answer delivery mode: auto (detect from client name), batch (full answer in result), stream (tokens via progress)")
 	showHelp := flag.Bool("h", false, "Show help")
 	flag.Parse()
+
+	// Apply mode override
+	switch *mode {
+	case "auto":
+		clientMode = ClientModeAuto
+	case "batch":
+		clientMode = ClientModeBatch
+	case "stream":
+		clientMode = ClientModeStream
+	default:
+		fmt.Fprintf(os.Stderr, "Invalid --client-mode value: %q (must be auto, batch, or stream)\n", *mode)
+		os.Exit(1)
+	}
 
 	// Apply model override
 	if *model != "" {
@@ -50,8 +80,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nEnvironment variables:\n")
 		fmt.Fprintf(os.Stderr, "  OLLAMA_BASE_URL     Ollama API URL (default: http://localhost:11434)\n")
 		fmt.Fprintf(os.Stderr, "  EMBEDDING_MODEL     Embedding model (default: embeddinggemma:latest)\n")
-		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: gemma3:4b)\n")
-		fmt.Fprintf(os.Stderr, "\nModel priority: --model flag > LLM_MODEL env > default (gemma3:4b)\n")
+		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: phi4-mini)\n")
+		fmt.Fprintf(os.Stderr, "\nModel priority: --model flag > LLM_MODEL env > default (phi4-mini)\n")
+		fmt.Fprintf(os.Stderr, "\nClient mode priority: --client-mode flag > auto-detect > default (auto)\n")
 		os.Exit(0)
 	}
 
@@ -79,11 +110,12 @@ func main() {
 
 	log.Printf("🚀 Starting rag-mcp server")
 	log.Printf("   DB path: %s", *dbPath)
+	log.Printf("   Client mode: %s", *mode)
 
 	// Create MCP server
 	s := server.NewMCPServer(
 		"rag-mcp",
-		"0.2.0",
+		"0.3.0",
 		server.WithInstructions(`RAG MCP — Retrieval-Augmented Generation knowledge base.
 
 Ingest documents, then ask questions. The system will:

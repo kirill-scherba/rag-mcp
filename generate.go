@@ -59,7 +59,8 @@ func boolPtr(b bool) *bool { return &b }
 
 // buildRAGPrompt constructs the LLM chat messages with system instruction,
 // context chunks and the user's question.
-func buildRAGPrompt(chunks []ragResult, question string) ([]OllamaChatMessage, error) {
+// style can be "strict" (copy-paste of exact signatures) or "creative" (free-form answer).
+func buildRAGPrompt(chunks []ragResult, question, style string) ([]OllamaChatMessage, error) {
 	var contextParts []string
 	for i, ch := range chunks {
 		contextParts = append(contextParts, fmt.Sprintf(
@@ -67,17 +68,47 @@ func buildRAGPrompt(chunks []ragResult, question string) ([]OllamaChatMessage, e
 	}
 	context := strings.Join(contextParts, "\n\n")
 
-	systemMsg := fmt.Sprintf(`You are a helpful AI assistant answering questions about the Cooksy project knowledge base.
+	var systemMsg string
+	if style == "creative" {
+		systemMsg = fmt.Sprintf(`You are a knowledgeable and helpful assistant. Answer the user's question using the provided context fragments. You may explain, analyze, connect ideas, and draw conclusions. Be conversational and thorough.
 
-Rules:
-- Answer the question based ONLY on the context fragments provided below.
-- If the context does not contain enough information, say so honestly.
-- Do not make up or hallucinate information.
-- Be concise but thorough.
-- Use natural, fluent language.
+RULES:
+1. Use the context fragments as your primary source of information.
+2. If the context contains relevant information, explain it in your own words.
+3. If the context does not contain the answer, say so clearly, then provide your best answer based on general knowledge.
+4. You MAY add explanations, examples, and natural language.
+5. You MAY draw inferences and connect multiple fragments together.
 
-Context:
-%s`, context)
+FRAGMENTS:
+%s
+
+Now answer the question using the fragments above.`, context)
+	} else {
+		// strict mode (default): exact copy-paste, no extra text
+		systemMsg = fmt.Sprintf(`You are a strict copy-paste assistant. Your ONLY job: find relevant function signatures in the fragments below and output them EXACTLY as written.
+
+RULES:
+1. Look at the fragments. Find lines that contain a Go function declaration matching the question.
+2. Output ONLY the exact function signature line(s) from the fragments. Nothing else.
+3. If the signature is split across multiple fragment lines, output them exactly as they appear.
+4. If you cannot find any matching function declaration in the fragments, output only: "Not found."
+5. DO NOT add explanations, descriptions, inferences, or natural language.
+6. DO NOT generate or complete any code not present verbatim in the fragments.
+
+Example of CORRECT output:
+func Insert[T any](db *sql.DB, rows ...T) (err error)
+
+Example of INCORRECT output (DO NOT DO THIS):
+"The Insert function accepts a database connection..."
+or
+"Based on Fragment 2, the function..."
+or any text that is not the exact function signature.
+
+FRAGMENTS:
+%s
+
+Now output the exact function signature(s) matching the question.`, context)
+	}
 
 	messages := []OllamaChatMessage{
 		{Role: "system", Content: systemMsg},
@@ -124,12 +155,18 @@ func parseOllamaResponse(data []byte) (string, error) {
 	return "", fmt.Errorf("failed to parse Ollama response (body: %s)", string(data))
 }
 
+// streamToStderr controls whether answer tokens are written to stderr.
+// Set to false when the client uses progress notifications for streaming
+// (e.g. Cline/IDE) to avoid duplicate output.
+var streamToStderr = true
+
 // TokenProgressFn is called with each token as it arrives from the LLM stream.
 type TokenProgressFn func(token string)
 
 // generateAnswerStream sends a streaming chat request to Ollama, calls
 // progressFn for each token as it arrives, and returns the full answer.
 // If progressFn is nil, tokens are accumulated silently.
+// If streamToStderr is true tokens are also written to stderr.
 func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgressFn) (string, error) {
 	baseURL := os.Getenv("OLLAMA_BASE_URL")
 	if baseURL == "" {
@@ -170,6 +207,7 @@ func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgress
 	// Stream NDJSON response line by line, write tokens to stderr
 	scanner := bufio.NewScanner(resp.Body)
 	var answer strings.Builder
+	streamStarted := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -183,11 +221,20 @@ func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgress
 
 		if chunk.Message != nil {
 			token := chunk.Message.Content
+			if !streamStarted {
+				streamStarted = true
+				if streamToStderr {
+					fmt.Fprintf(os.Stderr, "---LLM---")
+				}
+			}
 			if progressFn != nil {
 				progressFn(token)
 			}
 			// Stream token to stderr so user sees live answer in terminal
-			fmt.Fprintf(os.Stderr, "%s", token)
+			// (when not using progress-notification streaming)
+			if streamToStderr {
+				fmt.Fprintf(os.Stderr, "%s", token)
+			}
 			answer.WriteString(token)
 		}
 
