@@ -3,7 +3,7 @@ module github.com/kirill-scherba/rag-mcp
 go 1.26.2
 
 require (
-	github.com/kirill-scherba/keyvalembd v0.0.2
+	github.com/kirill-scherba/keyvalembd v0.1.0
 	github.com/mark3labs/mcp-go v0.49.0
 	github.com/spf13/cobra v1.10.2
 )
