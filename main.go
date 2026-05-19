@@ -42,6 +42,10 @@ const (
 // clientMode holds the current client mode (set at startup, readable globally).
 var clientMode ClientMode
 
+// streamAnswerToStderr enables legacy token streaming through stderr.
+// It is off by default because MCP clients may not drain stderr pipes.
+var streamAnswerToStderr bool
+
 func main() {
 	// Command line flags
 	dbPath := flag.String("db", "",
@@ -50,6 +54,8 @@ func main() {
 		"LLM model for answer generation (overrides LLM_MODEL env, default: phi4-mini)")
 	mode := flag.String("client-mode", "auto",
 		"Client answer delivery mode: auto (detect from client name), batch (full answer in result), stream (tokens via progress)")
+	streamStderr := flag.Bool("stream-stderr", false,
+		"Stream answer tokens to stderr (intended for rag-cli, which drains stderr)")
 	showHelp := flag.Bool("h", false, "Show help")
 	flag.Parse()
 
@@ -70,6 +76,7 @@ func main() {
 	if *model != "" {
 		ollamaModelOverride = *model
 	}
+	streamAnswerToStderr = *streamStderr
 
 	if *showHelp {
 		fmt.Fprintf(os.Stderr, "Usage: rag-mcp [options]\n\n")
@@ -111,6 +118,7 @@ func main() {
 	log.Printf("🚀 Starting rag-mcp server")
 	log.Printf("   DB path: %s", *dbPath)
 	log.Printf("   Client mode: %s", *mode)
+	log.Printf("   Stream stderr: %v", streamAnswerToStderr)
 
 	// Create MCP server
 	s := server.NewMCPServer(

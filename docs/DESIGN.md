@@ -45,7 +45,7 @@
 
 ### 4. LLM Generation (`generate.go`)
 - `buildRAGPrompt()` — formats context chunks + system instruction + user question into Ollama chat messages.
-- `generateAnswer()` — sends request to Ollama `/api/chat` endpoint with `stream: true`. Handles both streaming (NDJSON) and non-streaming responses. Aggregates content parts.
+- `generateAnswerStreamWithOptions()` — sends request to Ollama `/api/chat` endpoint with `stream: true`, aggregates NDJSON token chunks, and optionally emits tokens to stderr only when explicitly enabled.
 
 ## Data Flow: Query
 
@@ -135,6 +135,8 @@ Since rag-mcp must be available to spawn, either:
 | LLM | Ollama qwen2.5-7B | Local, fast, good quality |
 | Protocol | MCP JSON-RPC | Standard protocol for AI assistants |
 | Streaming | Always `stream: true` | Ollama may return NDJSON even with `stream: false` |
+| stderr token output | Disabled by default; enabled by `--stream-stderr` | Prevents blocked MCP clients when stderr is not drained; preserves rag-cli live token output |
+| Embedder readiness | Retry `embedder is not ready` for 10 seconds | Handles keyvalembd/Ollama cold starts without hiding persistent failures |
 | Chunk strategy | Sentence-based semantic | Splits by sentence boundaries, overlap preserves context |
 | Chunk min size | 500 chars | Avoid trivial chunks, each chunk has enough semantic weight |
 | Chunk target size | 1200 chars | Optimal for embedding models and LLM context windows |

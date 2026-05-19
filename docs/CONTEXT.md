@@ -24,6 +24,11 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 - Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`qwen2.5:1.5b`).
 - Implements MCP via [mcp-go](https://github.com/mark3labs/mcp-go) SDK.
 
+## Recent Fixes
+
+- 2026-05-19: `rag_query` now keeps stderr token streaming disabled by default to avoid blocking MCP clients that do not drain stderr pipes. `rag-cli` can still enable legacy stderr token streaming with `--stream-stderr`.
+- 2026-05-19: Embedding writes and semantic search retry `embedder is not ready` during keyvalembd/Ollama cold start before returning an error.
+
 ## Author
 
 Kirill Scherba

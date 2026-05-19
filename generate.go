@@ -155,19 +155,29 @@ func parseOllamaResponse(data []byte) (string, error) {
 	return "", fmt.Errorf("failed to parse Ollama response (body: %s)", string(data))
 }
 
-// streamToStderr controls whether answer tokens are written to stderr.
-// Set to false when the client uses progress notifications for streaming
-// (e.g. Cline/IDE) to avoid duplicate output.
-var streamToStderr = true
-
 // TokenProgressFn is called with each token as it arrives from the LLM stream.
 type TokenProgressFn func(token string)
+
+// GenerateAnswerOptions controls answer streaming side effects.
+type GenerateAnswerOptions struct {
+	ProgressFn     TokenProgressFn
+	StreamToStderr bool
+}
 
 // generateAnswerStream sends a streaming chat request to Ollama, calls
 // progressFn for each token as it arrives, and returns the full answer.
 // If progressFn is nil, tokens are accumulated silently.
-// If streamToStderr is true tokens are also written to stderr.
+// Tokens are also written to stderr for legacy CLI callers.
 func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgressFn) (string, error) {
+	return generateAnswerStreamWithOptions(messages, GenerateAnswerOptions{
+		ProgressFn:     progressFn,
+		StreamToStderr: true,
+	})
+}
+
+// generateAnswerStreamWithOptions sends a streaming chat request to Ollama,
+// reports token progress, and returns the full answer.
+func generateAnswerStreamWithOptions(messages []OllamaChatMessage, opts GenerateAnswerOptions) (string, error) {
 	baseURL := os.Getenv("OLLAMA_BASE_URL")
 	if baseURL == "" {
 		baseURL = ollamaBaseURL
@@ -204,7 +214,7 @@ func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgress
 		return "", fmt.Errorf("Ollama returned error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	// Stream NDJSON response line by line, write tokens to stderr
+	// Stream NDJSON response line by line.
 	scanner := bufio.NewScanner(resp.Body)
 	var answer strings.Builder
 	streamStarted := false
@@ -223,16 +233,16 @@ func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgress
 			token := chunk.Message.Content
 			if !streamStarted {
 				streamStarted = true
-				if streamToStderr {
+				if opts.StreamToStderr {
 					fmt.Fprintf(os.Stderr, "---LLM---")
 				}
 			}
-			if progressFn != nil {
-				progressFn(token)
+			if opts.ProgressFn != nil {
+				opts.ProgressFn(token)
 			}
 			// Stream token to stderr so user sees live answer in terminal
 			// (when not using progress-notification streaming)
-			if streamToStderr {
+			if opts.StreamToStderr {
 				fmt.Fprintf(os.Stderr, "%s", token)
 			}
 			answer.WriteString(token)

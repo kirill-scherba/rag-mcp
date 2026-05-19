@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/s3lite"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -37,6 +38,36 @@ type ragResult struct {
 // sequentially, avoiding race conditions when multiple requests arrive
 // on the same stdin stream (e.g. ingest → query → delete in one pipe).
 var mu sync.Mutex
+
+const (
+	embedderRetryAttempts = 40
+	embedderRetryDelay    = 250 * time.Millisecond
+)
+
+func isEmbedderNotReady(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "embedder is not ready")
+}
+
+func withEmbedderRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
+	var zero T
+	var lastErr error
+	for attempt := 0; attempt < embedderRetryAttempts; attempt++ {
+		result, err := op()
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if !isEmbedderNotReady(err) {
+			return zero, err
+		}
+		select {
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		case <-time.After(embedderRetryDelay):
+		}
+	}
+	return zero, lastErr
+}
 
 // tools returns all MCP tools for rag-mcp.
 func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
@@ -123,7 +154,9 @@ Provide either 'text' (inline content) or 'file_path' (path to file on disk).`),
 				valJSON, _ := json.Marshal(val)
 
 				// Store with embedding (the chunk text is used for embedding)
-				info, err := kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+				info, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
+					return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+				})
 				if err != nil {
 					return mcp.NewToolResultText(fmt.Sprintf(
 						"Error storing chunk %d/%d: %v", i+1, len(chunks), err)), nil
@@ -235,7 +268,9 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 						"stored":   time.Now().UTC().Format(time.RFC3339),
 					}
 					valJSON, _ := json.Marshal(val)
-					if _, err := kv.SetWithEmbedding(chunkKey, valJSON, chunk); err != nil {
+					if _, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
+						return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+					}); err != nil {
 						fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: chunk %d error: %v", filePath, i+1, err))
 						continue
 					}
@@ -346,7 +381,9 @@ If key is empty, auto-generates from the URL path.`),
 					"stored":   time.Now().UTC().Format(time.RFC3339),
 				}
 				valJSON, _ := json.Marshal(val)
-				info, err := kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+				info, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
+					return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+				})
 				if err != nil {
 					return mcp.NewToolResultText(fmt.Sprintf(
 						"Error storing chunk %d/%d: %v", i+1, len(chunks), err)), nil
@@ -420,19 +457,11 @@ an answer using the LLM.`),
 				useStream = true
 			case ClientModeAuto:
 				useStream = hasProgressToken
-			// ClientModeBatch: useStream stays false
+				// ClientModeBatch: useStream stays false
 			}
 
-			// Derive and store decision for later use
+			// Derive and store decision for later use.
 			isStreamMode := useStream
-
-			// When streaming via progress notifications, suppress stderr output
-			// to avoid duplicate tokens appearing in the CLI/IDE terminal.
-			if isStreamMode {
-				streamToStderr = false
-			} else {
-				streamToStderr = true
-			}
 
 			// Extract progressToken from request metadata (if provided by client)
 			var progressToken mcp.ProgressToken
@@ -458,7 +487,9 @@ an answer using the LLM.`),
 
 			// Stage 1: Semantic search
 			sendProgress(0, 100, "🔍 Searching knowledge base...")
-			searchResults, err := kv.SearchSemantic(question, topK)
+			searchResults, err := withEmbedderRetry(ctx, func() ([]keyvalembd.SearchResult, error) {
+				return kv.SearchSemantic(question, topK)
+			})
 			if err != nil {
 				sendProgress(100, 100, "❌ Search failed")
 				return mcp.NewToolResultText(fmt.Sprintf(
@@ -538,7 +569,10 @@ an answer using the LLM.`),
 				}
 			}
 
-			answer, err := generateAnswerStream(messages, progressFn)
+			answer, err := generateAnswerStreamWithOptions(messages, GenerateAnswerOptions{
+				ProgressFn:     progressFn,
+				StreamToStderr: streamAnswerToStderr,
+			})
 			if isStreamMode {
 				// In stream mode, accumulate all tokens and use them as the answer
 				// (answer from generateAnswerStream is the same, but we also have answerBuf)
