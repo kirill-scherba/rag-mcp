@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	github.com/kirill-scherba/keyvalembd v0.1.0
+	github.com/kirill-scherba/s3lite v0.1.2
 	github.com/mark3labs/mcp-go v0.49.0
 	github.com/spf13/cobra v1.10.2
 )
@@ -24,7 +25,6 @@ require (
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/kirill-scherba/s3lite v0.1.2 // indirect
 	github.com/klauspost/compress v1.12.3 // indirect
 	github.com/libsql/sqlite-antlr4-parser v0.0.0-20240327125255-dbf53b6cbf06 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

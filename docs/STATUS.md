@@ -17,6 +17,7 @@
 | 2026-05-03 | Semantic chunking — sentence split, overlap, min 500 chars | ✅ Done |
 | 2026-05-03 | rag-cli — standalone CLI with query/ingest/list/delete | ✅ Done |
 | 2026-05-19 | Fix rag_query stderr streaming and cold-start embedder retries | ✅ Done |
+| 2026-05-21 | Refactor: split tools.go into ingest.go, query.go, metadata.go | ✅ Done |
 
 ## Current State
 
@@ -28,8 +29,9 @@
   - Auto-discovers `rag-mcp` binary (PATH, same dir, GOPATH/bin)
 - **LLM**: Uses Ollama `/api/chat` with `stream: true` for reliable NDJSON parsing
 - **Storage**: keyvalembd (libSQL + vector embeddings)
-- **Chunker**: Sentence-based semantic chunking with overlap (2 sentences) and target size 1200 chars (min 500, max 2000)
+- **Chunker**: Sentence-based semantic chunking with overlap (2 sentences) and target size 1200 chars (min 500, max 2000). Includes `generateDescription()` for auto doc descriptions.
 - **Runtime safety**: `rag_query` no longer writes answer tokens to stderr by default, preventing blocked MCP clients; embedding/search operations retry briefly while keyvalembd initializes its embedder
+- **Code structure**: Tools split into logical modules — `tools.go` (routing + list/delete), `ingest.go`, `query.go`, `metadata.go`
 - **No known issues**
 
 ## Test Results

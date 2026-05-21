@@ -332,6 +332,38 @@ func stddevSentenceLength(text string) float64 {
 	return math.Sqrt(variance)
 }
 
+// generateDescription creates a short description from text.
+// It takes the first up to maxLen characters, breaking at a word boundary.
+// If the text is shorter than maxLen, returns it trimmed.
+func generateDescription(text string, maxLen int) string {
+	if maxLen <= 0 {
+		maxLen = 150
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	// Normalize whitespace to single spaces for description generation
+	text = strings.Join(strings.Fields(text), " ")
+	runes := []rune(text)
+	if len(runes) <= maxLen {
+		return string(runes)
+	}
+	// Find last space before maxLen
+	segment := runes[:maxLen]
+	lastSpace := -1
+	for i := len(segment) - 1; i >= 0; i-- {
+		if unicode.IsSpace(segment[i]) {
+			lastSpace = i
+			break
+		}
+	}
+	if lastSpace > 0 {
+		return string(segment[:lastSpace]) + "..."
+	}
+	return string(segment) + "..."
+}
+
 // chunkText wraps chunkTextSemantic for backward compatibility.
 // Deprecated: use chunkTextSemantic directly.
 func chunkText(text string) []string {
