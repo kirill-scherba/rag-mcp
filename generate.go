@@ -117,44 +117,6 @@ Now output the exact function signature(s) matching the question.`, context)
 	return messages, nil
 }
 
-// parseOllamaResponse handles both streaming (NDJSON) and non-streaming JSON
-// responses from the Ollama /api/chat endpoint.
-func parseOllamaResponse(data []byte) (string, error) {
-	// Try parsing as single JSON object first (non-streaming response)
-	var singleResp OllamaChatResponse
-	if err := json.Unmarshal(data, &singleResp); err == nil {
-		if singleResp.Message != nil {
-			return strings.TrimSpace(singleResp.Message.Content), nil
-		}
-	}
-
-	// Fallback: parse as NDJSON (streaming response with one JSON object per line)
-	var answerParts []string
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		var chunk OllamaChatResponse
-		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-			continue // skip malformed lines
-		}
-		if chunk.Message != nil {
-			answerParts = append(answerParts, chunk.Message.Content)
-		}
-		if chunk.Done {
-			break
-		}
-	}
-	if len(answerParts) > 0 {
-		answer := strings.Join(answerParts, "")
-		return strings.TrimSpace(answer), nil
-	}
-
-	return "", fmt.Errorf("failed to parse Ollama response (body: %s)", string(data))
-}
-
 // TokenProgressFn is called with each token as it arrives from the LLM stream.
 type TokenProgressFn func(token string)
 
