@@ -5,7 +5,6 @@
 package main
 
 import (
-	"math"
 	"strings"
 	"testing"
 )
@@ -144,39 +143,6 @@ func TestChunkTextSemanticDedupe(t *testing.T) {
 	}
 }
 
-// TestChunkString verifies the chunkString utility.
-func TestChunkString(t *testing.T) {
-	tests := []struct {
-		name string
-		s    string
-		n    int
-		step int
-		want []string
-	}{
-		{"empty string", "", 5, 2, []string{}},
-		{"n <= 0", "hello", 0, 2, []string{}},
-		{"step <= 0", "hello", 5, 0, []string{}},
-		{"shorter than n", "hi", 5, 2, []string{"hi"}},
-		{"exactly n", "hello", 5, 2, []string{"hello"}},
-		{"longer than n step=n", "abcdefgh", 3, 3, []string{"abc", "def", "gh"}},
-		{"longer step half", "abcdefghij", 4, 2, []string{"abcd", "cdef", "efgh", "ghij", "ij"}},
-		{"unicode", "привет мир", 3, 2, []string{"при", "иве", "ет ", " ми", "ир"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := chunkString(tt.s, tt.n, tt.step)
-			if len(got) != len(tt.want) {
-				t.Fatalf("chunkString(%q, %d, %d) = %v, want %v", tt.s, tt.n, tt.step, got, tt.want)
-			}
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("chunk %d: got %q, want %q", i, got[i], tt.want[i])
-				}
-			}
-		})
-	}
-}
-
 // TestSentenceIter verifies sentence boundary detection.
 func TestSentenceIter(t *testing.T) {
 	tests := []struct {
@@ -218,84 +184,6 @@ func TestSentenceIter(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestCountSentences verifies sentence counting.
-func TestCountSentences(t *testing.T) {
-	tests := []struct {
-		input string
-		want  int
-	}{
-		{"", 0},
-		{"One.", 1},
-		{"One. Two. Three.", 3},
-		{"No punctuation here", 1}, // fallback: whole text counts as 1
-		{"Whitespace only", 1},
-	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := countSentences(tt.input)
-			if got != tt.want {
-				t.Errorf("countSentences(%q) = %d, want %d", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-// TestSentenceLengths verifies sentence length calculation.
-func TestSentenceLengths(t *testing.T) {
-	input := "Hi. Hello world."
-	want := []int{3, 12}
-	got := sentenceLengths(input)
-	if len(got) != len(want) {
-		t.Fatalf("sentenceLengths(%q) = %v, want %v", input, got, want)
-	}
-	for i := range got {
-		if got[i] != want[i] {
-			t.Errorf("length %d: got %d, want %d", i, got[i], want[i])
-		}
-	}
-
-	// Empty input
-	emptyGot := sentenceLengths("")
-	if len(emptyGot) != 0 {
-		t.Errorf("sentenceLengths(\"\") = %v, want empty", emptyGot)
-	}
-}
-
-// TestAverageSentenceLength verifies mean calculation.
-func TestAverageSentenceLength(t *testing.T) {
-	tests := []struct {
-		input string
-		want  float64
-	}{
-		{"", 0},
-		{"A.", 2},
-		{"A. BB.", 2.5},
-	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := averageSentenceLength(tt.input)
-			if math.Abs(got-tt.want) > 0.001 {
-				t.Errorf("averageSentenceLength(%q) = %f, want %f", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-// TestStddevSentenceLength verifies standard deviation.
-func TestStddevSentenceLength(t *testing.T) {
-	// Uniform text → stddev should be 0
-	uniform := "A. B. C. D."
-	gotUniform := stddevSentenceLength(uniform)
-	if gotUniform != 0 {
-		t.Errorf("stddevSentenceLength(%q) = %f, want 0", uniform, gotUniform)
-	}
-
-	// Empty text
-	if stddevSentenceLength("") != 0 {
-		t.Errorf("stddevSentenceLength(\"\") = %f, want 0", stddevSentenceLength(""))
 	}
 }
 

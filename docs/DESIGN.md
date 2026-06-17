@@ -94,7 +94,14 @@ Answer text returned to user
 - **Framework**: `spf13/cobra` for CLI structure
 - **Client**: `mark3labs/mcp-go/client` — stdio MCP client to rag-mcp
 - **Auto-discovery**: Locates `rag-mcp` binary in PATH, same directory, or `$GOPATH/bin`
-- **Token streaming**: rag-mcp writes LLM tokens to stderr; rag-cli proxies this to user's stderr for real-time streaming feedback
+- **Token streaming**: rag-mcp writes LLM tokens to stderr; rag-cli proxies this to user's stderr via `proxyStderrWithThinking()` for real-time streaming feedback with a "Thinking..." spinner until the first token arrives
+- **Source files**:
+  - `main.go` — root command, persistent flags (`--db`, `--model`)
+  - `client.go` — MCP stdio client, auto-discovery, stderr proxy
+  - `query.go` — `rag_query` wrapper with `--style` flag
+  - `ingest.go` — subcommands: `text`, `file`, `dir`, `url`
+  - `list.go` — `rag_list` wrapper
+  - `delete.go` — `rag_delete` wrapper
 
 ### Commands
 

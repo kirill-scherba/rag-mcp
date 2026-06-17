@@ -19,7 +19,8 @@
 | 2026-05-19 | Fix rag_query stderr streaming and cold-start embedder retries | ✅ Done |
 | 2026-05-21 | Refactor: split tools.go into ingest.go, query.go, metadata.go | ✅ Done |
 | 2026-06-17 | Remove dead code from chunker.go (#1) | ✅ Done |
-| 2026-06-17 | Refactor: extract storeChunks, dedupe chunk storage loop across 3 tools | 🔄 In progress |
+| 2026-06-17 | Refactor: extract storeChunks, dedupe chunk storage loop across 3 tools | ✅ Done |
+| 2026-06-17 | Implement rag-cli source at cmd/rag-cli/ — Cobra, MCP stdio, stderr streaming | ✅ Done |
 
 ## Current State
 
