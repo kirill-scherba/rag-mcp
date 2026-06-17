@@ -1,3 +1,7 @@
 rag-mcp
 rag-cli
 !cmd/rag-cli/
+coverage.out
+*.db
+*.db-shm
+*.db-wal

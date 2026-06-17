@@ -18,6 +18,8 @@
 | 2026-05-03 | rag-cli — standalone CLI with query/ingest/list/delete | ✅ Done |
 | 2026-05-19 | Fix rag_query stderr streaming and cold-start embedder retries | ✅ Done |
 | 2026-05-21 | Refactor: split tools.go into ingest.go, query.go, metadata.go | ✅ Done |
+| 2026-06-17 | Remove dead code from chunker.go (#1) | ✅ Done |
+| 2026-06-17 | Refactor: extract storeChunks, dedupe chunk storage loop across 3 tools | ✅ Done |
 | 2026-06-17 | Implement rag-cli source at cmd/rag-cli/ — Cobra, MCP stdio, stderr streaming | ✅ Done |
 
 ## Current State
@@ -32,7 +34,7 @@
 - **Storage**: keyvalembd (libSQL + vector embeddings)
 - **Chunker**: Sentence-based semantic chunking with overlap (2 sentences) and target size 1200 chars (min 500, max 2000). Includes `generateDescription()` for auto doc descriptions.
 - **Runtime safety**: `rag_query` no longer writes answer tokens to stderr by default, preventing blocked MCP clients; embedding/search operations retry briefly while keyvalembd initializes its embedder
-- **Code structure**: Tools split into logical modules — `tools.go` (routing + list/delete), `ingest.go`, `query.go`, `metadata.go`
+- **Code structure**: Tools split into logical modules — `tools.go` (routing + list/delete), `ingest.go` (ingest tools using shared `storeChunks`), `query.go`, `metadata.go` (shared `storeChunks`, `storeMeta`, `deleteOldChunks`)
 - **No known issues**
 
 ## Test Results

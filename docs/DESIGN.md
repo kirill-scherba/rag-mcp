@@ -33,7 +33,6 @@
 - **Semantic chunking** — accumulates sentences until target size (~1200 chars), with a minimum of 500 chars and hard max of 2000 chars.
 - **Overlap** — preserves the last 2 sentences from each chunk as overlap into the next chunk for context continuity.
 - **Deduplication** — removes consecutive identical chunks that can occur with tiny documents.
-- **Helper functions** — `countSentences`, `sentenceLengths`, `averageSentenceLength`, `stddevSentenceLength` for metrics and debugging.
 
 ### 3. Tools (`tools.go`)
 - **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
