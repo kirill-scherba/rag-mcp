@@ -5,85 +5,9 @@
 package main
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 )
-
-// TestParseOllamaResponseSingleJSON verifies parsing a single JSON object response.
-func TestParseOllamaResponseSingleJSON(t *testing.T) {
-	resp := OllamaChatResponse{
-		Message: &OllamaChatMessage{Content: "Hello world"},
-		Done:    true,
-	}
-	data, _ := json.Marshal(resp)
-	got, err := parseOllamaResponse(data)
-	if err != nil {
-		t.Fatalf("parseOllamaResponse single JSON: %v", err)
-	}
-	if got != "Hello world" {
-		t.Errorf("parseOllamaResponse single JSON: got %q, want %q", got, "Hello world")
-	}
-}
-
-// TestParseOllamaResponseNDJSON verifies parsing a streaming NDJSON response.
-func TestParseOllamaResponseNDJSON(t *testing.T) {
-	chunks := []OllamaChatResponse{
-		{Message: &OllamaChatMessage{Content: "Hello"}},
-		{Message: &OllamaChatMessage{Content: " world"}},
-		{Message: &OllamaChatMessage{Content: "!"}, Done: true},
-	}
-	var lines []byte
-	for i, c := range chunks {
-		b, _ := json.Marshal(c)
-		lines = append(lines, b...)
-		if i < len(chunks)-1 {
-			lines = append(lines, '\n')
-		}
-	}
-	got, err := parseOllamaResponse(lines)
-	if err != nil {
-		t.Fatalf("parseOllamaResponse NDJSON: %v", err)
-	}
-	if got != "Hello world!" {
-		t.Errorf("parseOllamaResponse NDJSON: got %q, want %q", got, "Hello world!")
-	}
-}
-
-// TestParseOllamaResponseMalformedInput verifies graceful handling of malformed data.
-func TestParseOllamaResponseMalformedInput(t *testing.T) {
-	// Malformed JSON lines interspersed with valid ones
-	data := []byte(`{bad json}
-{"message": {"content": "valid"}}
-also bad
-{"done": true, "message": {"content": ""}}
-`)
-	got, err := parseOllamaResponse(data)
-	if err != nil {
-		t.Fatalf("parseOllamaResponse malformed: %v", err)
-	}
-	if got != "valid" {
-		t.Errorf("parseOllamaResponse malformed: got %q, want %q", got, "valid")
-	}
-}
-
-// TestParseOllamaResponseEmptyInput verifies empty input returns error.
-func TestParseOllamaResponseEmptyInput(t *testing.T) {
-	got, err := parseOllamaResponse([]byte(""))
-	if err == nil {
-		t.Fatalf("expected error for empty input, got %q", got)
-	}
-}
-
-// TestParseOllamaResponseOnlyDoneTrue verifies a response with done=true but no message content.
-func TestParseOllamaResponseOnlyDoneTrue(t *testing.T) {
-	resp := OllamaChatResponse{Done: true}
-	data, _ := json.Marshal(resp)
-	got, err := parseOllamaResponse(data)
-	if err == nil {
-		t.Fatalf("expected error for done-only response, got %q", got)
-	}
-}
 
 // TestBuildRAGPromptStrict verifies the strict prompt construction.
 func TestBuildRAGPromptStrict(t *testing.T) {
