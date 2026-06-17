@@ -18,6 +18,7 @@
 | 2026-05-03 | rag-cli — standalone CLI with query/ingest/list/delete | ✅ Done |
 | 2026-05-19 | Fix rag_query stderr streaming and cold-start embedder retries | ✅ Done |
 | 2026-05-21 | Refactor: split tools.go into ingest.go, query.go, metadata.go | ✅ Done |
+| 2026-06-17 | Implement rag-cli source at cmd/rag-cli/ — Cobra, MCP stdio, stderr streaming | ✅ Done |
 
 ## Current State
 
