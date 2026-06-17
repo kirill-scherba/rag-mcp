@@ -5,7 +5,6 @@
 package main
 
 import (
-	"math"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -233,103 +232,6 @@ func chunkTextSemantic(text string) []string {
 	}
 
 	return chunks
-}
-
-// chunkString splits a string into overlapping windows of n characters,
-// stepping by step characters. Returns empty slice for invalid inputs.
-func chunkString(s string, n, step int) []string {
-	if n <= 0 || step <= 0 || s == "" {
-		return []string{}
-	}
-	runes := []rune(s)
-	if len(runes) <= n {
-		return []string{s}
-	}
-	var result []string
-	for i := 0; i < len(runes); i += step {
-		end := i + n
-		if end > len(runes) {
-			end = len(runes)
-		}
-		result = append(result, string(runes[i:end]))
-	}
-	return result
-}
-
-// countSentences counts the approximate number of sentences in text.
-func countSentences(text string) int {
-	count := 0
-	it := &sentenceIter{text: text}
-	for {
-		_, _, done := it.next()
-		if done {
-			break
-		}
-		count++
-	}
-	if count == 0 && strings.TrimSpace(text) != "" {
-		return 1
-	}
-	return count
-}
-
-// sentenceLengths returns the rune lengths of each sentence.
-func sentenceLengths(text string) []int {
-	var lengths []int
-	// Collect all sentences
-	type sentence struct {
-		text string
-	}
-	var sentences []sentence
-	it := &sentenceIter{text: text}
-	for {
-		start, end, done := it.next()
-		if done {
-			break
-		}
-		s := strings.TrimSpace(text[start:end])
-		if s != "" {
-			sentences = append(sentences, sentence{text: s})
-		}
-	}
-	for _, s := range sentences {
-		lengths = append(lengths, utf8.RuneCountInString(s.text))
-	}
-	return lengths
-}
-
-// averageSentenceLength returns the mean sentence length in runes.
-func averageSentenceLength(text string) float64 {
-	lengths := sentenceLengths(text)
-	if len(lengths) == 0 {
-		return 0
-	}
-	sum := 0
-	for _, l := range lengths {
-		sum += l
-	}
-	return float64(sum) / float64(len(lengths))
-}
-
-// stddevSentenceLength returns the standard deviation of sentence lengths.
-func stddevSentenceLength(text string) float64 {
-	lengths := sentenceLengths(text)
-	if len(lengths) == 0 {
-		return 0
-	}
-	avg := float64(0)
-	for _, l := range lengths {
-		avg += float64(l)
-	}
-	avg /= float64(len(lengths))
-
-	variance := float64(0)
-	for _, l := range lengths {
-		d := float64(l) - avg
-		variance += d * d
-	}
-	variance /= float64(len(lengths))
-	return math.Sqrt(variance)
 }
 
 // generateDescription creates a short description from text.
