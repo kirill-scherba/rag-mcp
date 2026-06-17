@@ -6,7 +6,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -112,4 +114,43 @@ func withEmbedderRetry[T any](ctx context.Context, op func() (T, error)) (T, err
 		}
 	}
 	return zero, lastErr
+}
+
+// storeChunks stores chunk texts with embeddings for a document.
+// Each chunk gets a sequential key, computed checksum, and the embedding vector.
+// Returns formatted result lines (one per chunk) and an error.
+// Fails on the first chunk storage error.
+func storeChunks(
+	ctx context.Context,
+	kv *keyvalembd.KeyValueEmbd,
+	docKey string,
+	chunks []string,
+	source string,
+) ([]string, error) {
+	var results []string
+	for i, chunk := range chunks {
+		chunkKey := fmt.Sprintf("%s/chunk/%04d", docKey, i)
+		checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(chunk)))
+		val := map[string]interface{}{
+			"index":    i,
+			"total":    len(chunks),
+			"checksum": checksum,
+			"text":     chunk,
+			"doc_key":  docKey,
+			"stored":   time.Now().UTC().Format(time.RFC3339),
+		}
+		if source != "" {
+			val["source"] = source
+		}
+		valJSON, _ := json.Marshal(val)
+		info, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
+			return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
+		})
+		if err != nil {
+			return results, fmt.Errorf("Error storing chunk %d/%d: %w", i+1, len(chunks), err)
+		}
+		results = append(results, fmt.Sprintf(
+			"  chunk %d/%d: key=%s, size=%d", i+1, len(chunks), info.Checksum, info.ContentLength))
+	}
+	return results, nil
 }
