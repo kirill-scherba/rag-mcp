@@ -6,8 +6,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,7 +16,6 @@ import (
 	"time"
 
 	"github.com/kirill-scherba/keyvalembd"
-	"github.com/kirill-scherba/s3lite"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -86,29 +83,9 @@ Provide either 'text' (inline content) or 'file_path' (path to file on disk).`),
 					"Error deleting old chunks for %q: %v", key, err)), nil
 			}
 
-			var results []string
-			for i, chunk := range chunks {
-				chunkKey := fmt.Sprintf("%s/chunk/%04d", key, i)
-				checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(chunk)))
-				val := map[string]interface{}{
-					"index":    i,
-					"total":    len(chunks),
-					"checksum": checksum,
-					"text":     chunk,
-					"doc_key":  key,
-					"stored":   time.Now().UTC().Format(time.RFC3339),
-				}
-				valJSON, _ := json.Marshal(val)
-				info, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
-					return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
-				})
-				if err != nil {
-					return mcp.NewToolResultText(fmt.Sprintf(
-						"Error storing chunk %d/%d: %v", i+1, len(chunks), err)), nil
-				}
-
-				results = append(results, fmt.Sprintf(
-					"  chunk %d/%d: key=%s, size=%d", i+1, len(chunks), info.Checksum, info.ContentLength))
+			results, err := storeChunks(ctx, kv, key, chunks, "")
+			if err != nil {
+				return mcp.NewToolResultText(err.Error()), nil
 			}
 
 			if err := storeMeta(ctx, kv, key, docMeta{
@@ -211,24 +188,10 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 
 				description := generateDescription(string(data), 150)
 
-				for i, chunk := range chunks {
-					chunkKey := fmt.Sprintf("%s/chunk/%04d", docKey, i)
-					checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(chunk)))
-					val := map[string]interface{}{
-						"index":    i,
-						"total":    len(chunks),
-						"checksum": checksum,
-						"text":     chunk,
-						"doc_key":  docKey,
-						"stored":   time.Now().UTC().Format(time.RFC3339),
-					}
-					valJSON, _ := json.Marshal(val)
-					if _, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
-						return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
-					}); err != nil {
-						fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: chunk %d error: %v", filePath, i+1, err))
-						continue
-					}
+				_, err = storeChunks(ctx, kv, docKey, chunks, filePath)
+				if err != nil {
+					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: %v", filePath, err))
+					continue
 				}
 
 				if err := storeMeta(ctx, kv, docKey, docMeta{
@@ -333,29 +296,9 @@ If key is empty, auto-generates from the URL path.`),
 
 			description := generateDescription(text, 150)
 
-			var results []string
-			for i, chunk := range chunks {
-				chunkKey := fmt.Sprintf("%s/chunk/%04d", docKey, i)
-				checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(chunk)))
-				val := map[string]interface{}{
-					"index":    i,
-					"total":    len(chunks),
-					"checksum": checksum,
-					"text":     chunk,
-					"doc_key":  docKey,
-					"source":   urlStr,
-					"stored":   time.Now().UTC().Format(time.RFC3339),
-				}
-				valJSON, _ := json.Marshal(val)
-				info, err := withEmbedderRetry(ctx, func() (*s3lite.ObjectInfo, error) {
-					return kv.SetWithEmbedding(chunkKey, valJSON, chunk)
-				})
-				if err != nil {
-					return mcp.NewToolResultText(fmt.Sprintf(
-						"Error storing chunk %d/%d: %v", i+1, len(chunks), err)), nil
-				}
-				results = append(results, fmt.Sprintf(
-					"  chunk %d/%d: key=%s, size=%d", i+1, len(chunks), info.Checksum, info.ContentLength))
+			results, err := storeChunks(ctx, kv, docKey, chunks, urlStr)
+			if err != nil {
+				return mcp.NewToolResultText(err.Error()), nil
 			}
 
 			if err := storeMeta(ctx, kv, docKey, docMeta{
