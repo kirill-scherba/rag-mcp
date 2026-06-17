@@ -1,2 +1,6 @@
 rag-mcp
 rag-cli
+coverage.out
+*.db
+*.db-shm
+*.db-wal
