@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -176,9 +175,4 @@ func ingestUrlCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&key, "key", "k", "", "Document key (auto-generated from URL if empty)")
 
 	return cmd
-}
-
-// normalizeKeyPrefix ensures the key prefix does not end with a trailing slash.
-func normalizeKeyPrefix(p string) string {
-	return strings.TrimSuffix(p, "/")
 }

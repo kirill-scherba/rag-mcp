@@ -21,9 +21,7 @@ import (
 
 // ragClient wraps an MCP stdio client connected to rag-mcp.
 type ragClient struct {
-	c          *client.Client
-	cmd        *exec.Cmd
-	ragMcpPath string
+	c *client.Client
 }
 
 var (
@@ -73,8 +71,7 @@ func newRagClient() (*ragClient, error) {
 	}
 
 	rc := &ragClient{
-		c:          mcpClient,
-		ragMcpPath: ragPath,
+		c: mcpClient,
 	}
 
 	// Start stderr proxy in the background

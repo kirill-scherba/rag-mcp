@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -79,11 +78,4 @@ func goPathBin() string {
 	return filepath.Join(home, "go", "bin")
 }
 
-// detectOS returns the GOOS-style OS name for binary suffixes.
-func detectOS() string {
-	goos := runtime.GOOS
-	if goos == "" {
-		return "linux"
-	}
-	return goos
-}
+
