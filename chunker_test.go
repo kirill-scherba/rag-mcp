@@ -147,11 +147,11 @@ func TestChunkTextSemanticDedupe(t *testing.T) {
 // TestChunkString verifies the chunkString utility.
 func TestChunkString(t *testing.T) {
 	tests := []struct {
-		name  string
-		s     string
-		n     int
-		step  int
-		want  []string
+		name string
+		s    string
+		n    int
+		step int
+		want []string
 	}{
 		{"empty string", "", 5, 2, []string{}},
 		{"n <= 0", "hello", 0, 2, []string{}},

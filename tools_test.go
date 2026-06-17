@@ -18,7 +18,7 @@ func TestCollectDocs(t *testing.T) {
 
 	// Populate keyvalembd with document structure
 	docs := []struct {
-		key   string
+		key    string
 		isMeta bool
 	}{
 		{"rag/docs/a/meta", true},
