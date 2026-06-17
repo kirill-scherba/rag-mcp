@@ -5,7 +5,7 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -150,23 +150,60 @@ func (r *ragClient) proxyStderrWithThinking() {
 	}
 
 	go func() {
-		reader := bufio.NewReader(stderrReader)
-		tokenSeen := false
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				if err != io.EOF {
-					// Silently ignore stderr read errors
-					_ = err
-				}
-				return
-			}
-			if !tokenSeen && strings.Contains(line, "---LLM---") {
-				tokenSeen = true
-				fmt.Fprintln(os.Stderr, "\r✅ Thinking...")
-				continue
-			}
-			fmt.Fprint(os.Stderr, line)
-		}
+		_ = streamStderrWithMarker(stderrReader, os.Stderr)
 	}()
+}
+
+// streamStderrWithMarker copies data from src to dst, buffering until the
+// marker "---LLM---" is found. Once the marker is seen it prints a spinner,
+// then flushes all remaining data immediately. Any trailing data is also
+// flushed on io.EOF.
+func streamStderrWithMarker(src io.Reader, dst io.Writer) error {
+	var buf bytes.Buffer
+	tokenSeen := false
+	marker := []byte("---LLM---")
+	tmp := make([]byte, 1024)
+
+	for {
+		n, err := src.Read(tmp)
+		if n > 0 {
+			buf.Write(tmp[:n])
+			for {
+				data := buf.Bytes()
+				if len(data) == 0 {
+					break
+				}
+				if !tokenSeen {
+					idx := bytes.Index(data, marker)
+					if idx == -1 {
+						// Marker not yet seen; keep buffered data for next read
+						break
+					}
+					tokenSeen = true
+					if idx > 0 {
+						// Print any prefix data before the marker
+						dst.Write(data[:idx])
+					}
+					fmt.Fprintln(dst, "\r✅ Thinking...")
+					buf.Next(idx + len(marker))
+					continue
+				}
+				// After marker: flush all buffered data immediately
+				dst.Write(data)
+				buf.Reset()
+				break
+			}
+		}
+		if err != nil {
+			if err != io.EOF {
+				_ = err
+			}
+			// Flush any remaining buffered data before exit
+			if buf.Len() > 0 {
+				dst.Write(buf.Bytes())
+				buf.Reset()
+			}
+			return nil
+		}
+	}
 }

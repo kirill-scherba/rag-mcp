@@ -143,6 +143,50 @@ func TestChunkTextSemanticDedupe(t *testing.T) {
 	}
 }
 
+// TestSentenceIter verifies sentence boundary detection.
+func TestSentenceIter(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want []string
+	}{
+		{"period", "First. Second.", []string{"First.", "Second."}},
+		{"exclamation", "Wow! Great!", []string{"Wow!", "Great!"}},
+		{"question", "What? Really?", []string{"What?", "Really?"}},
+		{"ellipsis", "Well… Maybe…", []string{"Well…", "Maybe…"}},
+		{"mixed", "Hello. Wow! What?", []string{"Hello.", "Wow!", "What?"}},
+		{"no punctuation", "no punctuation here", []string{"no punctuation here"}},
+		{"whitespace only", "   ", []string{}},
+		{"single space after period", "A. B. C.", []string{"A.", "B.", "C."}},
+		{"multi spaces after", "A.   B.", []string{"A.", "B."}},
+		{"newline separator", "A.\nB.", []string{"A.", "B."}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			it := &sentenceIter{text: tt.text}
+			var got []string
+			for {
+				start, end, done := it.next()
+				if done {
+					break
+				}
+				s := strings.TrimSpace(tt.text[start:end])
+				if s != "" {
+					got = append(got, s)
+				}
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("sentenceIter produced %d sentences, want %d: got %v, want %v", len(got), len(tt.want), got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("sentence %d: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 // TestGenerateDescription verifies description generation.
 func TestGenerateDescription(t *testing.T) {
 	tests := []struct {
