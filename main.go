@@ -12,7 +12,7 @@
 // Architecture:
 //   - Uses keyvalembd (libSQL + Ollama embeddings) for storage
 //   - Chunks documents by paragraphs with min chunk size (100 chars)
-//   - Generates answers via Ollama LLM (qwen2.5-7B by default)
+//   - Generates answers via Ollama LLM (phi4-mini by default)
 //   - Implements MCP (Model Context Protocol) via JSON-RPC 2.0 over stdin/stdout
 package main
 

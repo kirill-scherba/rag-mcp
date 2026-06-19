@@ -21,7 +21,7 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 ## Integration
 
 - Uses [keyvalembd](https://github.com/kirill-scherba/keyvalembd) for libSQL-backed key-value store with vector embeddings.
-- Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`qwen2.5:1.5b`).
+- Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`phi4-mini`).
 - Implements MCP via [mcp-go](https://github.com/mark3labs/mcp-go) SDK.
 
 ## Recent Fixes

@@ -138,7 +138,7 @@ Since rag-mcp must be available to spawn, either:
 |----------|--------|-----------|
 | Storage | keyvalembd (libSQL) | Embeddings in SQLite — no external vector DB needed |
 | Embeddings | Ollama embeddinggemma | Local embedding gen, no API keys |
-| LLM | Ollama qwen2.5-7B | Local, fast, good quality |
+| LLM | Ollama phi4-mini | Local, small, free, moderate speed |
 | Protocol | MCP JSON-RPC | Standard protocol for AI assistants |
 | Streaming | Always `stream: true` | Ollama may return NDJSON even with `stream: false` |
 | stderr token output | Disabled by default; enabled by `--stream-stderr` | Prevents blocked MCP clients when stderr is not drained; preserves rag-cli live token output |
