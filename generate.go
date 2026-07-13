@@ -18,7 +18,7 @@ import (
 
 // Default LLM models and Ollama settings.
 const (
-	defaultLLMModel = "phi4-mini" // "deepseek-v4-flash:cloud" // "gemma3:4b" // "qwen2.5:1.5b"
+	defaultLLMModel = "deepseek-v4-flash:cloud"
 	ollamaBaseURL   = "http://localhost:11434"
 	generateTimeout = 120 * time.Second
 )
