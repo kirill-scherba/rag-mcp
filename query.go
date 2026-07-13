@@ -123,8 +123,8 @@ an answer using the LLM.`),
 			}
 
 			style, _ := args["style"].(string)
-			if style != "strict" {
-				style = "creative"
+			if style == "" {
+				style = "strict"
 			}
 
 			messages, err := buildRAGPrompt(chunks, question, style)
