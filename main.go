@@ -124,13 +124,12 @@ func main() {
 	s := server.NewMCPServer(
 		"rag-mcp",
 		"0.3.0",
-		server.WithInstructions(`RAG MCP — Retrieval-Augmented Generation knowledge base.
+		server.WithInstructions(`RAG MCP — Document knowledge base with semantic search.
 
-Ingest documents, then ask questions. The system will:
-1. Split documents into chunks
-2. Generate embeddings for each chunk
-3. Store chunks for semantic search
-4. On query: find relevant chunks + generate answer via LLM
+Use rag_query when the user asks about events, characters, places, stories,
+or anything that might be in stored documents.
+
+At session start, call rag_list to see what documents are available.
 
 Available tools:
 - rag_ingest:           Ingest a document (by text or file_path)
