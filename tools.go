@@ -18,10 +18,11 @@ import (
 // tools returns all MCP tools for rag-mcp.
 func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
 	return []server.ServerTool{
-		ragIngestTool(kv),
-		ragIngestDirectoryTool(kv),
-		ragIngestUrlTool(kv),
-		ragQueryTool(srv, kv),
+			ragIngestTool(kv),
+			ragIngestDirectoryTool(kv),
+			ragIngestUrlTool(kv),
+			ragSearchTool(kv),
+			ragQueryTool(srv, kv),
 		ragDeleteTool(kv),
 		ragListTool(kv),
 	}
