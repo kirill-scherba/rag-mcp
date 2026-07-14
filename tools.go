@@ -112,13 +112,13 @@ func formatDocDetail(kv *keyvalembd.KeyValueEmbd, e docEntry) *mcp.CallToolResul
 	}
 	sort.Strings(chunkKeys)
 
-	if len(chunkKeys) > 0 {
+	if e.NumChunks > 0 {
 		out.WriteString("Chunks:\n")
-		for _, ck := range chunkKeys {
-			idx := strings.TrimPrefix(ck, e.Key+"/chunk/")
+		for i := 0; i < e.NumChunks; i++ {
+			chunkKey := fmt.Sprintf("%s/chunk/%04d", e.Key, i)
 			// Load chunk value and extract text preview when available.
 			textPreview := ""
-			if data, err := kv.Get(ck); err == nil && len(data) > 0 {
+			if data, err := kv.Get(chunkKey); err == nil && len(data) > 0 {
 				var ch struct {
 					Text string `json:"text"`
 				}
@@ -132,9 +132,9 @@ func formatDocDetail(kv *keyvalembd.KeyValueEmbd, e docEntry) *mcp.CallToolResul
 				}
 			}
 			if textPreview != "" {
-				out.WriteString(fmt.Sprintf("  chunk %s: %s\n", idx, textPreview))
+				out.WriteString(fmt.Sprintf("  chunk %04d: %s\n", i, textPreview))
 			} else {
-				out.WriteString(fmt.Sprintf("  chunk %s\n", idx))
+				out.WriteString(fmt.Sprintf("  chunk %04d\n", i))
 			}
 		}
 	} else {
