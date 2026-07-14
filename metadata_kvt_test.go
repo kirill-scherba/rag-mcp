@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"testing"
@@ -99,7 +100,7 @@ func TestDeleteOldChunks(t *testing.T) {
 		}
 	}
 
-	deleted, err := deleteOldChunks(nil, kv, docKey)
+	deleted, err := deleteOldChunks(context.TODO(), kv, docKey)
 	if err != nil {
 		t.Fatalf("deleteOldChunks: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestDeleteOldChunks(t *testing.T) {
 // TestDeleteOldChunksEmpty verifies delete on non-existent document.
 func TestDeleteOldChunksEmpty(t *testing.T) {
 	kv := setupTestKV(t)
-	deleted, err := deleteOldChunks(nil, kv, "nonexistent/doc")
+	deleted, err := deleteOldChunks(context.TODO(), kv, "nonexistent/doc")
 	if err != nil {
 		t.Fatalf("deleteOldChunks on empty: %v", err)
 	}
@@ -159,7 +160,7 @@ func TestDeleteOldChunksRespectsBoundaries(t *testing.T) {
 		t.Fatalf("kv.Set sibling meta: %v", err)
 	}
 
-	deleted, err := deleteOldChunks(nil, kv, docKey)
+	deleted, err := deleteOldChunks(context.TODO(), kv, docKey)
 	if err != nil {
 		t.Fatalf("deleteOldChunks: %v", err)
 	}
