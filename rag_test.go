@@ -73,9 +73,9 @@ Third paragraph covering deployment and configuration options.`,
 
 // TestRAGIntegration is an integration test that verifies the full RAG pipeline:
 //
-//	1. Ingest a document (chunk → embed → store)
-//	2. Query the knowledge base (semantic search + LLM generation)
-//	3. Delete the document
+//  1. Ingest a document (chunk → embed → store)
+//  2. Query the knowledge base (semantic search + LLM generation)
+//  3. Delete the document
 //
 // This test requires Ollama to be running with the embedding and LLM models.
 func TestRAGIntegration(t *testing.T) {

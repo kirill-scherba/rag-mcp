@@ -19,11 +19,11 @@ import (
 // tools returns all MCP tools for rag-mcp.
 func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
 	return []server.ServerTool{
-			ragIngestTool(kv),
-			ragIngestDirectoryTool(kv),
-			ragIngestUrlTool(kv),
-			ragSearchTool(kv),
-			ragQueryTool(srv, kv),
+		ragIngestTool(kv),
+		ragIngestDirectoryTool(kv),
+		ragIngestUrlTool(kv),
+		ragSearchTool(kv),
+		ragQueryTool(srv, kv),
 		ragDeleteTool(kv),
 		ragListTool(kv),
 	}
@@ -103,14 +103,6 @@ func formatDocDetail(kv *keyvalembd.KeyValueEmbd, e docEntry) *mcp.CallToolResul
 		out.WriteString(fmt.Sprintf(", stored %s", e.Stored))
 	}
 	out.WriteString("\n\n")
-
-	var chunkKeys []string
-	for k := range kv.List(e.Key) {
-		if isChunkKey(k) {
-			chunkKeys = append(chunkKeys, k)
-		}
-	}
-	sort.Strings(chunkKeys)
 
 	if e.NumChunks > 0 {
 		out.WriteString("Chunks:\n")

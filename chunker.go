@@ -29,9 +29,9 @@ const (
 
 // sentenceIter splits text into sentences and yields them one at a time.
 type sentenceIter struct {
-	text  string
-	pos   int
-	done  bool
+	text string
+	pos  int
+	done bool
 }
 
 // next returns the next sentence (start, end) byte offsets.
@@ -265,5 +265,3 @@ func generateDescription(text string, maxLen int) string {
 	}
 	return string(segment) + "..."
 }
-
-
