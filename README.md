@@ -7,8 +7,9 @@
 - **Document Ingestion** (`rag_ingest`): Split text into semantic chunks, generate embeddings, store in libSQL. Supports inline text or file path. Auto-generates description from text.
 - **Batch Directory Ingestion** (`rag_ingest_directory`): Ingest all `.md`/`.txt` files from a directory in one call.
 - **URL Ingestion** (`rag_ingest_url`): Fetch a web page and ingest its content.
+- **Raw Semantic Search** (`rag_search`): Search the knowledge base for relevant chunks and return them with similarity scores. No LLM generation — useful for debugging embeddings and for tools that need raw results.
 - **Semantic Search & QA** (`rag_query`): Find relevant chunks by meaning and generate answers via Ollama LLM.
-- **Smart Document Listing** (`rag_list`): Recursive listing with descriptions, chunk counts, and stored dates. Shows document details when given a specific key.
+- **Smart Document Listing** (`rag_list`): Recursive listing with descriptions, chunk counts, and stored dates. Shows document details when given a specific key, including the first 100 characters of each chunk's text.
 - **Document Deletion** (`rag_delete`): Remove documents and all their chunks from the knowledge base.
 - **Duplicate Prevention**: Re-ingesting a document automatically deletes old chunks before storing new ones.
 - **MCP Protocol**: JSON-RPC 2.0 over stdin/stdout — works with any MCP client (AI assistants, tools, etc.).
@@ -89,8 +90,9 @@ Model priority: --model flag > LLM_MODEL env > default (phi4-mini)
 | `rag_ingest` | Ingest a document — chunk, embed, and store text for semantic search. Optional `description` (auto-generated if empty). |
 | `rag_ingest_directory` | Ingest all files from a directory. Auto-generates document keys from filenames. |
 | `rag_ingest_url` | Fetch a URL and ingest its content. Auto-generates key from URL if not provided. |
+| `rag_search` | Search chunks by semantic similarity. Returns matching chunks with scores and text previews. |
 | `rag_query` | Ask a question — semantic search + LLM answer generation |
-| `rag_list` | List documents recursively with descriptions and chunk counts. Show details for a specific key. |
+| `rag_list` | List documents recursively with descriptions and chunk counts. Show details for a specific key, including chunk text previews. |
 | `rag_delete` | Delete a document and all its chunks from the knowledge base |
 
 ## Example
@@ -118,6 +120,14 @@ Model priority: --model flag > LLM_MODEL env > default (phi4-mini)
 {
   "url": "https://example.com/docs",
   "key": "rag/web/example/docs"
+}
+```
+
+**Search chunks:**
+```json
+{
+  "query": "Cooksy features",
+  "top_k": 3
 }
 ```
 

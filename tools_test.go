@@ -173,6 +173,33 @@ func TestFormatDocDetail(t *testing.T) {
 	}
 }
 
+// TestFormatDocDetailWithChunkText verifies chunk text preview is shown when
+// chunk values contain JSON with a text field.
+func TestFormatDocDetailWithChunkText(t *testing.T) {
+	kv := setupTestKV(t)
+
+	chunkJSON := `{"index":0,"total":1,"text":"Cooksy is a recipe sharing platform built with Go and Vuejs."}`
+	if _, err := kv.Set("rag/docs/texttest/chunk/0000", []byte(chunkJSON)); err != nil {
+		t.Fatalf("kv.Set: %v", err)
+	}
+
+	entry := docEntry{
+		Key:       "rag/docs/texttest",
+		NumChunks: 1,
+	}
+	result := formatDocDetail(kv, entry)
+	if result == nil {
+		t.Fatal("formatDocDetail returned nil")
+	}
+	text := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(text, "Cooksy is a recipe sharing platform") {
+		t.Errorf("expected chunk text preview in output, got: %s", text)
+	}
+	if !strings.Contains(text, "chunk 0000:") {
+		t.Errorf("expected chunk index with colon, got: %s", text)
+	}
+}
+
 // TestFormatDocDetailNoChunks verifies output when no chunks exist.
 func TestFormatDocDetailNoChunks(t *testing.T) {
 	kv := setupTestKV(t)

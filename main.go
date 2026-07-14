@@ -135,6 +135,7 @@ Available tools:
 - rag_ingest:           Ingest a document (by text or file_path)
 - rag_ingest_directory: Ingest all documents from a directory
 - rag_ingest_url:       Fetch a URL and ingest its content
+- rag_search:           Search chunks by semantic similarity (returns chunks + scores)
 - rag_query:            Ask a question (semantic search + LLM answer)
 - rag_list:             List stored documents
 - rag_delete:           Delete a document and all its chunks`),
@@ -143,7 +144,7 @@ Available tools:
 	// Register all tools
 	s.AddTools(tools(s, kv)...)
 
-	log.Printf("✅ Registered 6 tools")
+	log.Printf("✅ Registered 7 tools")
 
 	// Start the server over stdin/stdout (JSON-RPC 2.0)
 	if err := server.ServeStdio(s); err != nil {

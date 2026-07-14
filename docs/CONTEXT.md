@@ -14,7 +14,8 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 
 - **Document Ingestion** (`rag_ingest`): Split text into chunks, generate embeddings, store in libSQL.
 - **Semantic Search & QA** (`rag_query`): Find relevant chunks and answer questions via LLM.
-- **List Documents** (`rag_list`): List document keys or chunks in the knowledge base.
+- **Raw Semantic Search** (`rag_search`): Search for relevant chunks and return them with similarity scores, without LLM generation.
+- **List Documents** (`rag_list`): List document keys or chunks in the knowledge base; detailed view shows chunk text previews.
 - **Document Deletion** (`rag_delete`): Remove documents and all their chunks.
 - **MCP Protocol**: JSON-RPC 2.0 over stdin/stdout — works with any MCP client.
 
