@@ -42,7 +42,7 @@ in real time.`,
 	}
 
 	cmd.Flags().StringVarP(&style, "style", "s", "",
-		"Answer style: strict (exact signatures) or creative (free-form, default)")
+		"Answer style: creative (default, free-form) or strict (exact copy-paste)")
 
 	return cmd
 }

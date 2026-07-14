@@ -30,7 +30,7 @@ an answer using the LLM.`),
 			mcp.Description("Number of context fragments to retrieve (default: 5, max: 20)"),
 		),
 		mcp.WithString("style",
-			mcp.Description("Answer style: 'strict' (default) for exact copy-paste, 'creative' for free-form explanation"),
+			mcp.Description("Answer style: 'creative' (default) for free-form explanation, 'strict' for exact copy-paste"),
 		),
 	)
 

@@ -37,6 +37,7 @@ query, list, and delete operations without an AI assistant.`,
 
 	rootCmd.AddCommand(
 		queryCmd(),
+		searchCmd(),
 		ingestCmd(),
 		listCmd(),
 		deleteCmd(),

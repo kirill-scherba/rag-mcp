@@ -126,8 +126,9 @@ func main() {
 		"0.3.0",
 		server.WithInstructions(`RAG MCP — Document knowledge base with semantic search.
 
-Use rag_query when the user asks about events, characters, places, stories,
-or anything that might be in stored documents.
+Use rag_query (default style=creative) for narrative questions about
+events, characters, places, stories. Use style=strict only when exact
+citations are required (code, dates, specs).
 
 At session start, call rag_list to see what documents are available.
 

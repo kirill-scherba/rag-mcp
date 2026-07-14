@@ -28,6 +28,7 @@
 - **7 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_search`, `rag_query`, `rag_list`, `rag_delete` — all functional
 - **CLI client**: `rag-cli` — standalone binary using MCP stdio client (Cobra framework)
   - `query` with real-time LLM token streaming to stderr
+  - `search` — semantic search without LLM (scores + chunk text)
   - `ingest` with subcommands: `text`, `file`, `dir`, `url`
   - `list`, `delete`
   - Auto-discovers `rag-mcp` binary (PATH, same dir, GOPATH/bin)
@@ -59,6 +60,14 @@
 ./rag-cli list           # Listed 2 entries (rag/, sqlh/)
 ./rag-cli query "..."    # Connected to rag-mcp, streamed tokens, returned answer
 ```
+
+## rag-cli Commands
+
+- `rag-cli query <question> [-s style]` — Ask question with LLM answer
+- `rag-cli search <query> [-k topK]` — Semantic search without LLM (new)
+- `rag-cli ingest` — Ingest documents (text, file, dir, URL)
+- `rag-cli list [key]` — List documents or chunks
+- `rag-cli delete <key>` — Delete document
 
 ## Next Steps
 
