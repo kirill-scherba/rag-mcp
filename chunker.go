@@ -266,8 +266,4 @@ func generateDescription(text string, maxLen int) string {
 	return string(segment) + "..."
 }
 
-// chunkText wraps chunkTextSemantic for backward compatibility.
-// Deprecated: use chunkTextSemantic directly.
-func chunkText(text string) []string {
-	return chunkTextSemantic(text)
-}
+

@@ -57,9 +57,9 @@ Third paragraph covering deployment and configuration options.`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := chunkText(tt.input)
+			got := chunkTextSemantic(tt.input)
 			if len(got) < tt.wantMin {
-				t.Errorf("chunkText() = %d chunks, want >= %d", len(got), tt.wantMin)
+				t.Errorf("chunkTextSemantic() = %d chunks, want >= %d", len(got), tt.wantMin)
 			}
 			// Verify no extraneous whitespace in chunks
 			for i, c := range got {
@@ -108,7 +108,7 @@ architecture with Go backend services communicating via gRPC.`
 	// ─── Ingest ────────────────────────────────────────────────────────────────
 
 	t.Log("📥 Ingesting document...")
-	chunks := chunkText(docText)
+	chunks := chunkTextSemantic(docText)
 	if len(chunks) == 0 {
 		t.Fatal("no chunks generated from document")
 	}
@@ -146,8 +146,6 @@ architecture with Go backend services communicating via gRPC.`
 
 	t.Log("🔍 Querying knowledge base...")
 	question := "What is Cooksy and what are its key features?"
-	question = "Что такое Cooksy и какие у него ключевые возможности?"
-	question = "как добавить строку в БД в go package 'kirill-scherba/sqlh'"
 	searchResults, err := kv.SearchSemantic(question, 3)
 	if err != nil {
 		t.Fatalf("SearchSemantic: %v", err)
@@ -181,9 +179,9 @@ architecture with Go backend services communicating via gRPC.`
 		t.Fatalf("buildRAGPrompt: %v", err)
 	}
 
-	answer, err := generateAnswerStream(messages, nil)
+	answer, err := generateAnswerStreamWithOptions(messages, GenerateAnswerOptions{})
 	if err != nil {
-		t.Fatalf("generateAnswerStream: %v", err)
+		t.Fatalf("generateAnswerStreamWithOptions: %v", err)
 	}
 	t.Logf("   Answer: %s", answer)
 

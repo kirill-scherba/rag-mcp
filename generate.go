@@ -126,17 +126,6 @@ type GenerateAnswerOptions struct {
 	StreamToStderr bool
 }
 
-// generateAnswerStream sends a streaming chat request to Ollama, calls
-// progressFn for each token as it arrives, and returns the full answer.
-// If progressFn is nil, tokens are accumulated silently.
-// Tokens are also written to stderr for legacy CLI callers.
-func generateAnswerStream(messages []OllamaChatMessage, progressFn TokenProgressFn) (string, error) {
-	return generateAnswerStreamWithOptions(messages, GenerateAnswerOptions{
-		ProgressFn:     progressFn,
-		StreamToStderr: true,
-	})
-}
-
 // generateAnswerStreamWithOptions sends a streaming chat request to Ollama,
 // reports token progress, and returns the full answer.
 func generateAnswerStreamWithOptions(messages []OllamaChatMessage, opts GenerateAnswerOptions) (string, error) {

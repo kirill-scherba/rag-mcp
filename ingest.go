@@ -67,15 +67,15 @@ Provide either 'text' (inline content) or 'file_path' (path to file on disk).`),
 				return mcp.NewToolResultText("Error: key and either text or file_path are required"), nil
 			}
 
-			description, _ := args["description"].(string)
-			if description == "" {
-				description = generateDescription(text, 150)
-			}
+		description, _ := args["description"].(string)
+		if description == "" {
+			description = generateDescription(text, 150)
+		}
 
-			chunks := chunkText(text)
-			if len(chunks) == 0 {
-				return mcp.NewToolResultText("Error: no chunks generated from text"), nil
-			}
+		chunks := chunkTextSemantic(text)
+		if len(chunks) == 0 {
+			return mcp.NewToolResultText("Error: no chunks generated from text"), nil
+		}
 
 			deletedOld, err := deleteOldChunks(ctx, kv, key)
 			if err != nil {
@@ -174,8 +174,8 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 				baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 				docKey := keyPrefix + "/" + baseName
 
-				chunks := chunkText(string(data))
-				if len(chunks) == 0 {
+			chunks := chunkTextSemantic(string(data))
+			if len(chunks) == 0 {
 					fileResults = append(fileResults, fmt.Sprintf("  ⚠️  %s: no chunks generated", filePath))
 					continue
 				}
@@ -277,16 +277,16 @@ If key is empty, auto-generates from the URL path.`),
 			}
 
 			text := string(body)
-			if len(text) == 0 {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Error: empty content from %q", urlStr)), nil
-			}
+		if len(text) == 0 {
+			return mcp.NewToolResultText(fmt.Sprintf(
+				"Error: empty content from %q", urlStr)), nil
+		}
 
-			chunks := chunkText(text)
-			if len(chunks) == 0 {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Error: no chunks generated from %q", urlStr)), nil
-			}
+		chunks := chunkTextSemantic(text)
+		if len(chunks) == 0 {
+			return mcp.NewToolResultText(fmt.Sprintf(
+				"Error: no chunks generated from %q", urlStr)), nil
+		}
 
 			deletedOld, err := deleteOldChunks(ctx, kv, docKey)
 			if err != nil {
