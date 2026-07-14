@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -115,7 +116,26 @@ func formatDocDetail(kv *keyvalembd.KeyValueEmbd, e docEntry) *mcp.CallToolResul
 		out.WriteString("Chunks:\n")
 		for _, ck := range chunkKeys {
 			idx := strings.TrimPrefix(ck, e.Key+"/chunk/")
-			out.WriteString(fmt.Sprintf("  chunk %s\n", idx))
+			// Load chunk value and extract text preview when available.
+			textPreview := ""
+			if data, err := kv.Get(ck); err == nil && len(data) > 0 {
+				var ch struct {
+					Text string `json:"text"`
+				}
+				if json.Unmarshal(data, &ch) == nil && ch.Text != "" {
+					runes := []rune(ch.Text)
+					if len(runes) > 100 {
+						textPreview = string(runes[:100]) + "…"
+					} else {
+						textPreview = ch.Text
+					}
+				}
+			}
+			if textPreview != "" {
+				out.WriteString(fmt.Sprintf("  chunk %s: %s\n", idx, textPreview))
+			} else {
+				out.WriteString(fmt.Sprintf("  chunk %s\n", idx))
+			}
 		}
 	} else {
 		out.WriteString("No chunks found.\n")
