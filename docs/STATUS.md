@@ -21,10 +21,11 @@
 | 2026-06-17 | Remove dead code from chunker.go (#1) | ✅ Done |
 | 2026-06-17 | Refactor: extract storeChunks, dedupe chunk storage loop across 3 tools | ✅ Done |
 | 2026-06-17 | Implement rag-cli source at cmd/rag-cli/ — Cobra, MCP stdio, stderr streaming | ✅ Done |
+| 2026-07-14 | Cleanup after RAG overhaul + add rag_search + chunk text previews (#11) | ✅ Done |
 
 ## Current State
 
-- **6 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_query`, `rag_list`, `rag_delete` — all functional
+- **7 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_search`, `rag_query`, `rag_list`, `rag_delete` — all functional
 - **CLI client**: `rag-cli` — standalone binary using MCP stdio client (Cobra framework)
   - `query` with real-time LLM token streaming to stderr
   - `ingest` with subcommands: `text`, `file`, `dir`, `url`

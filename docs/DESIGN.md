@@ -38,8 +38,9 @@
 - **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
 - **`rag_ingest_directory`**: Accepts `key_prefix`, `dir_path`, and optional `pattern` (default `*.md,*.txt`). Scans directory, reads each matching file, ingests with key `<key_prefix>/<filename>`.
 - **`rag_ingest_url`**: Accepts `url` (required) and optional `key`. Fetches URL via HTTP GET, chunks and stores content. Auto-generates key from host+path if not provided.
+- **`rag_search`**: Accepts `query` text. Performs semantic search on stored chunks and returns the matching chunks with similarity scores and text previews. No LLM generation.
 - **`rag_query`**: Accepts `question` text. Performs semantic search on stored chunks, builds RAG prompt, calls LLM. Returns combined answer.
-- **`rag_list`**: Lists document keys or chunks in the knowledge base.
+- **`rag_list`**: Lists document keys or chunks in the knowledge base. When listing a specific document, shows chunk metadata and the first 100 characters of each chunk's text (with graceful fallback to index-only for non-JSON chunk values).
 - **`rag_delete`**: Accepts `key` (document key prefix). Lists all chunks with that prefix and deletes them from keyvalembd. Returns deleted count.
 
 ### 4. LLM Generation (`generate.go`)
@@ -198,6 +199,21 @@ Since rag-mcp must be available to spawn, either:
       "url": { "type": "string", "description": "URL to fetch and ingest" }
     },
     "required": ["url"]
+  }
+}
+```
+
+### rag_search
+```json
+{
+  "name": "rag_search",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string", "description": "Search query" },
+      "top_k": { "type": "number", "description": "Max results (default: 5, max: 20)" }
+    },
+    "required": ["query"]
   }
 }
 ```
