@@ -15,6 +15,7 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 - **Document Ingestion** (`rag_ingest`): Split text into chunks, generate embeddings, store in libSQL.
 - **Semantic Search & QA** (`rag_query`): Find relevant chunks and answer questions via LLM.
 - **Raw Semantic Search** (`rag_search`): Search for relevant chunks and return them with similarity scores, without LLM generation.
+- **Exact Keyword Search** (`rag_find`): SQL LIKE search over chunk text and document descriptions; needs no embeddings and works with Ollama down (complements semantic search).
 - **List Documents** (`rag_list`): List document keys or chunks in the knowledge base; detailed view shows chunk text previews.
 - **Document Deletion** (`rag_delete`): Remove documents and all their chunks.
 - **MCP Protocol**: JSON-RPC 2.0 over stdin/stdout — works with any MCP client.
@@ -28,8 +29,8 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 ### Runtime dependencies and provider note
 
 - **LLM (answer generation)** is used only by `rag_query`. `rag_search`,
-  `rag_list`, `rag_ingest*` and `rag_delete` do not call an LLM, so a client
-  that only searches or ingests needs no chat model.
+  `rag_find`, `rag_list`, `rag_ingest*` and `rag_delete` do not call an LLM, so
+  a client that only searches or ingests needs no chat model.
 - **Embeddings** (Ollama `embeddinggemma:latest`) are required by ingest and by
   semantic search. This is intentional: Ollama is a runtime dependency of the
   RAG — and therefore of any GUI built on top of it. Embeddings use a fixed,

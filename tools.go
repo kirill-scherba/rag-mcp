@@ -17,15 +17,73 @@ import (
 )
 
 // tools returns all MCP tools for rag-mcp.
-func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) []server.ServerTool {
+func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd, ti *textIndex) []server.ServerTool {
 	return []server.ServerTool{
 		ragIngestTool(kv),
 		ragIngestDirectoryTool(kv),
 		ragIngestUrlTool(kv),
 		ragSearchTool(kv),
+		ragFindTool(ti),
 		ragQueryTool(srv, kv),
 		ragDeleteTool(kv),
 		ragListTool(kv),
+	}
+}
+
+// ragFindTool performs exact keyword (SQL LIKE) search, complementing the
+// semantic rag_search. It needs no embeddings and works with Ollama down.
+func ragFindTool(ti *textIndex) server.ServerTool {
+	opt := mcp.NewTool("rag_find",
+		mcp.WithDescription(`Exact keyword search (SQL LIKE) across the knowledge base.
+Complements rag_search (semantic): use it for an exact word or phrase —
+names, places, quotes (e.g. "Золотая Вобла", "Шашлычная 1957"). Case-insensitive
+for ASCII; a first-letter-uppercase variant is also tried for Russian.`),
+		mcp.WithString("keyword",
+			mcp.Description("Keyword or phrase to search for"),
+			mcp.Required(),
+		),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum number of results (default: 20, max: 100)"),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: opt,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if ti == nil {
+				return mcp.NewToolResultText("Text search is unavailable (no database connection)."), nil
+			}
+			args := request.GetArguments()
+			keyword, _ := args["keyword"].(string)
+			if keyword == "" {
+				return mcp.NewToolResultText("Error: keyword is required"), nil
+			}
+			limit := 20
+			if v, ok := args["limit"].(float64); ok {
+				limit = int(v)
+			}
+
+			results, err := ti.find(keyword, limit)
+			if err != nil {
+				return mcp.NewToolResultText(fmt.Sprintf("Error: %v", err)), nil
+			}
+			if len(results) == 0 {
+				return mcp.NewToolResultText(fmt.Sprintf("No results found for keyword: %s", keyword)), nil
+			}
+
+			var out strings.Builder
+			fmt.Fprintf(&out, "Found %d result(s) for %q:\n\n", len(results), keyword)
+			for i, r := range results {
+				preview := []rune(r.Text)
+				if len(preview) > 160 {
+					preview = preview[:160]
+				}
+				fmt.Fprintf(&out, "%d. %s\n   %s\n\n", i+1, r.Key, string(preview))
+			}
+			return mcp.NewToolResultText(out.String()), nil
+		},
 	}
 }
 

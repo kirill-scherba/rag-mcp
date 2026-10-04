@@ -115,6 +115,15 @@ func main() {
 	}
 	defer kv.Close()
 
+	// Keyword search uses a separate read connection to the same database.
+	ti, terr := openTextIndex(*dbPath)
+	if terr != nil {
+		log.Printf("⚠️  text search unavailable: %v", terr)
+	}
+	if ti != nil {
+		defer ti.Close()
+	}
+
 	log.Printf("🚀 Starting rag-mcp server")
 	log.Printf("   DB path: %s", *dbPath)
 	log.Printf("   Client mode: %s", *mode)
@@ -137,15 +146,16 @@ Available tools:
 - rag_ingest_directory: Ingest all documents from a directory
 - rag_ingest_url:       Fetch a URL and ingest its content
 - rag_search:           Search chunks by semantic similarity (returns chunks + scores)
+- rag_find:             Exact keyword search (SQL LIKE; no embeddings needed)
 - rag_query:            Ask a question (semantic search + LLM answer)
 - rag_list:             List stored documents
 - rag_delete:           Delete a document and all its chunks`),
 	)
 
 	// Register all tools
-	s.AddTools(tools(s, kv)...)
+	s.AddTools(tools(s, kv, ti)...)
 
-	log.Printf("✅ Registered 7 tools")
+	log.Printf("✅ Registered 8 tools")
 
 	// Start the server over stdin/stdout (JSON-RPC 2.0)
 	if err := server.ServeStdio(s); err != nil {

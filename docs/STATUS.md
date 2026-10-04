@@ -22,10 +22,14 @@
 | 2026-06-17 | Refactor: extract storeChunks, dedupe chunk storage loop across 3 tools | ✅ Done |
 | 2026-06-17 | Implement rag-cli source at cmd/rag-cli/ — Cobra, MCP stdio, stderr streaming | ✅ Done |
 | 2026-07-14 | Cleanup after RAG overhaul + add rag_search + chunk text previews (#11) | ✅ Done |
+| 2026-10-04 | Ingest any supported file via anytext/totext | ✅ Done |
+| 2026-10-04 | Upgrade keyvalembd to v0.6.1 (pure-Go sqlite + vecindex); legacy DB read transparently; search parity verified on a prod-DB copy | ✅ Done |
+| 2026-10-04 | Fix answer model to `deepseek-v4.1-flash:cloud` (old name retired) | ✅ Done |
+| 2026-10-04 | Add `rag_find` — SQL LIKE keyword search + `rag-cli find` | ✅ Done |
 
 ## Current State
 
-- **7 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_search`, `rag_query`, `rag_list`, `rag_delete` — all functional
+- **8 tools**: `rag_ingest`, `rag_ingest_directory`, `rag_ingest_url`, `rag_search`, `rag_find`, `rag_query`, `rag_list`, `rag_delete` — all functional
 - **CLI client**: `rag-cli` — standalone binary using MCP stdio client (Cobra framework)
   - `query` with real-time LLM token streaming to stderr
   - `search` — semantic search without LLM (scores + chunk text)
