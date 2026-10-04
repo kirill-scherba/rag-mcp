@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -53,12 +52,12 @@ Provide either 'text' (inline content) or 'file_path' (path to file on disk).`),
 
 			var text string
 			if filePath, ok := args["file_path"].(string); ok && filePath != "" {
-				data, err := os.ReadFile(filePath)
+				extracted, err := extractFileText(ctx, filePath)
 				if err != nil {
 					return mcp.NewToolResultText(fmt.Sprintf(
-						"Error reading file %q: %v", filePath, err)), nil
+						"Error extracting file %q: %v", filePath, err)), nil
 				}
-				text = string(data)
+				text = extracted
 			} else if t, ok := args["text"].(string); ok {
 				text = t
 			}
@@ -165,7 +164,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 			var fileResults []string
 			totalChunks := 0
 			for _, filePath := range files {
-				data, err := os.ReadFile(filePath)
+				fileText, err := extractFileText(ctx, filePath)
 				if err != nil {
 					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: %v", filePath, err))
 					continue
@@ -174,7 +173,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 				baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 				docKey := keyPrefix + "/" + baseName
 
-				chunks := chunkTextSemantic(string(data))
+				chunks := chunkTextSemantic(fileText)
 				if len(chunks) == 0 {
 					fileResults = append(fileResults, fmt.Sprintf("  ⚠️  %s: no chunks generated", filePath))
 					continue
@@ -186,7 +185,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 					continue
 				}
 
-				description := generateDescription(string(data), 150)
+				description := generateDescription(fileText, 150)
 
 				_, err = storeChunks(ctx, kv, docKey, chunks, filePath)
 				if err != nil {
