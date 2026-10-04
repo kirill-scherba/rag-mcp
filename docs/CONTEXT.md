@@ -23,7 +23,22 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 
 - Uses [keyvalembd](https://github.com/kirill-scherba/keyvalembd) for libSQL-backed key-value store with vector embeddings.
 - Uses [anytext/totext](https://github.com/kirill-scherba/anytext) to turn any ingested file (text, DOCX, HTML, PDF, images) into text.
-- Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`phi4-mini`).
+- Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`deepseek-v4.1-flash:cloud`).
+
+### Runtime dependencies and provider note
+
+- **LLM (answer generation)** is used only by `rag_query`. `rag_search`,
+  `rag_list`, `rag_ingest*` and `rag_delete` do not call an LLM, so a client
+  that only searches or ingests needs no chat model.
+- **Embeddings** (Ollama `embeddinggemma:latest`) are required by ingest and by
+  semantic search. This is intentional: Ollama is a runtime dependency of the
+  RAG — and therefore of any GUI built on top of it. Embeddings use a fixed,
+  good local model.
+- **Model name is provider-specific.** `deepseek-v4.1-flash:cloud` is an Ollama
+  cloud-model identifier. A future GUI may use any provider; the model must be
+  selectable via `LLM_MODEL` / `--model`, never hard-coded at call sites.
+- **Never write to the production database from tests.** `--db` selects the
+  database; every experiment must point at a copy or a scratch path.
 - Implements MCP via [mcp-go](https://github.com/mark3labs/mcp-go) SDK.
 
 ## Recent Fixes
