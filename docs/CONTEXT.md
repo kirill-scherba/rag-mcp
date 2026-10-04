@@ -25,6 +25,7 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 - Uses [keyvalembd](https://github.com/kirill-scherba/keyvalembd) for libSQL-backed key-value store with vector embeddings.
 - Uses [anytext/totext](https://github.com/kirill-scherba/anytext) to turn any ingested file (text, DOCX, HTML, PDF, images) into text.
 - Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`deepseek-v4.1-flash:cloud`).
+- Runtime dependency licenses (Ollama MIT, embeddinggemma/Gemma terms, no CGO): see [LICENSING.md](LICENSING.md).
 
 ### Runtime dependencies and provider note
 
