@@ -78,5 +78,3 @@ func goPathBin() string {
 	}
 	return filepath.Join(home, "go", "bin")
 }
-
-

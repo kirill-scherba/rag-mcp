@@ -17,8 +17,13 @@ import (
 )
 
 // Default LLM models and Ollama settings.
+//
+// The model name is a provider-specific identifier. Today the only backend is
+// Ollama (and its cloud models via the same API); a future GUI may use any
+// provider, so LLM_MODEL / --model must stay the single knob (see
+// docs/CONTEXT.md).
 const (
-	defaultLLMModel = "deepseek-v4-flash:cloud"
+	defaultLLMModel = "deepseek-v4.1-flash:cloud"
 	ollamaBaseURL   = "http://localhost:11434"
 	generateTimeout = 120 * time.Second
 )

@@ -28,7 +28,9 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 
 ## Recent Fixes
 
-- 2026-10-04: `rag_ingest` and `rag_ingest_directory` convert `file_path` through the [anytext/totext](https://github.com/kirill-scherba/anytext) library instead of `os.ReadFile`, so any supported document can be ingested directly: text, Markdown, HTML, CSV/TSV, DOCX, PDF (native text plus OCR for scanned pages) and images (OCR). Pages are joined with a blank line before chunking. Depends on `github.com/kirill-scherba/anytext v0.1.0`.
+- 2026-10-04: **keyvalembd upgraded to v0.6.1** (pure-Go `modernc.org/sqlite` + in-process `vecindex`, DiskANN/libSQL removed). The existing database keeps its legacy `embedding` BLOB column and keyvalembd reads it transparently; verified by running the same semantic query before and after — **identical results and scores**. Also bumped `anytext` to v0.2.3.
+- 2026-10-04: **answer model fixed** to `deepseek-v4.1-flash:cloud` (the previous `deepseek-v4-flash:cloud` was retired and Ollama returned HTTP 410). The model is provider-specific and overridable with `LLM_MODEL` or `--model`; it is the single knob — see the provider note below.
+- 2026-10-04: `rag_ingest` and `rag_ingest_directory` convert `file_path` through the [anytext/totext](https://github.com/kirill-scherba/anytext) library instead of `os.ReadFile`, so any supported document can be ingested directly: text, Markdown, HTML, CSV/TSV, DOCX, PDF (native text plus OCR for scanned pages) and images (OCR). Pages are joined with a blank line before chunking.
 - 2026-05-19: `rag_query` now keeps stderr token streaming disabled by default to avoid blocking MCP clients that do not drain stderr pipes. `rag-cli` can still enable legacy stderr token streaming with `--stream-stderr`.
 - 2026-05-19: Embedding writes and semantic search retry `embedder is not ready` during keyvalembd/Ollama cold start before returning an error.
 

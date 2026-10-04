@@ -12,7 +12,7 @@
 // Architecture:
 //   - Uses keyvalembd (libSQL + Ollama embeddings) for storage
 //   - Chunks documents by paragraphs with min chunk size (100 chars)
-//   - Generates answers via Ollama LLM (phi4-mini by default)
+//   - Generates answers via Ollama LLM (deepseek-v4.1-flash:cloud by default)
 //   - Implements MCP (Model Context Protocol) via JSON-RPC 2.0 over stdin/stdout
 package main
 
@@ -51,7 +51,7 @@ func main() {
 	dbPath := flag.String("db", "",
 		"Path to the database (default: ~/.config/rag-mcp/rag.db)")
 	model := flag.String("model", "",
-		"LLM model for answer generation (overrides LLM_MODEL env, default: phi4-mini)")
+		"LLM model for answer generation (overrides LLM_MODEL env, default: deepseek-v4.1-flash:cloud)")
 	mode := flag.String("client-mode", "auto",
 		"Client answer delivery mode: auto (detect from client name), batch (full answer in result), stream (tokens via progress)")
 	streamStderr := flag.Bool("stream-stderr", false,
@@ -87,8 +87,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nEnvironment variables:\n")
 		fmt.Fprintf(os.Stderr, "  OLLAMA_BASE_URL     Ollama API URL (default: http://localhost:11434)\n")
 		fmt.Fprintf(os.Stderr, "  EMBEDDING_MODEL     Embedding model (default: embeddinggemma:latest)\n")
-		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: phi4-mini)\n")
-		fmt.Fprintf(os.Stderr, "\nModel priority: --model flag > LLM_MODEL env > default (phi4-mini)\n")
+		fmt.Fprintf(os.Stderr, "  LLM_MODEL           LLM model for answer generation (default: deepseek-v4.1-flash:cloud)\n")
+		fmt.Fprintf(os.Stderr, "\nModel priority: --model flag > LLM_MODEL env > default (deepseek-v4.1-flash:cloud)\n")
 		fmt.Fprintf(os.Stderr, "\nClient mode priority: --client-mode flag > auto-detect > default (auto)\n")
 		os.Exit(0)
 	}
