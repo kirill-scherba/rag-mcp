@@ -96,7 +96,7 @@ func (t *TextIndex) Find(keyword string, limit int) ([]FindResult, error) {
 
 	query := `
 		SELECT key, CAST(value AS TEXT) AS val FROM kv_data
-		WHERE ucontains(key, ?) OR ucontains(CAST(value AS TEXT), ?)
+		WHERE key NOT LIKE '%/meta' AND (ucontains(key, ?) OR ucontains(CAST(value AS TEXT), ?))
 		ORDER BY key
 		LIMIT ?`
 

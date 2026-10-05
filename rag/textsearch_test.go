@@ -69,13 +69,14 @@ func TestTextIndexFind(t *testing.T) {
 		t.Fatalf("ascii case-insensitive search: %+v", res)
 	}
 
-	// Document description is found too.
+	// Document metadata rows (/meta) are excluded: keyword search covers the
+	// content chunks, not the derived descriptions.
 	res, err = ti.Find("прогулке", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res) != 1 || !strings.Contains(res[0].Text, "прогулке") {
-		t.Fatalf("description search: %+v", res)
+	if len(res) != 0 {
+		t.Fatalf("meta rows must be excluded: %+v", res)
 	}
 
 	// No match.
