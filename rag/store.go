@@ -159,10 +159,25 @@ func (s *Store) storeMeta(ctx context.Context, docKey string, meta DocMeta) erro
 	return err
 }
 
+// allKeys returns every leaf key under a prefix. List collapses child keys
+// into folder entries (e.g. "doc/chunk/"), and Del on a folder entry is a
+// no-op, so deletion must recurse to the actual leaf keys.
+func (s *Store) allKeys(prefix string) []string {
+	var out []string
+	for key := range s.kv.List(prefix) {
+		if strings.HasSuffix(key, "/") {
+			out = append(out, s.allKeys(key)...)
+		} else {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
 // deleteOldChunks removes all existing chunks and metadata for a document.
 func (s *Store) deleteOldChunks(ctx context.Context, docKey string) (int, error) {
 	deleted := 0
-	for key := range s.kv.List(docKey) {
+	for _, key := range s.allKeys(docKey) {
 		if err := s.kv.Del(key); err != nil {
 			return deleted, err
 		}
@@ -321,7 +336,7 @@ func (s *Store) ChunkText(docKey string, i int) string {
 // Delete removes a document and all its entries (chunks and metadata).
 func (s *Store) Delete(docKey string) (int, error) {
 	deleted := 0
-	for key := range s.kv.List(docKey) {
+	for _, key := range s.allKeys(docKey) {
 		if err := s.kv.Del(key); err != nil {
 			return deleted, err
 		}
