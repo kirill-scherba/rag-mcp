@@ -7,11 +7,13 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/kirill-scherba/rag-mcp/rag"
 )
 
 // TestBuildRAGPromptStrict verifies the strict prompt construction.
 func TestBuildRAGPromptStrict(t *testing.T) {
-	chunks := []ragResult{
+	chunks := []rag.Result{
 		{Text: "func Foo() error", Score: 0.9},
 		{Text: "func Bar(x int)", Score: 0.8},
 	}
@@ -41,7 +43,7 @@ func TestBuildRAGPromptStrict(t *testing.T) {
 
 // TestBuildRAGPromptCreative verifies the creative prompt construction.
 func TestBuildRAGPromptCreative(t *testing.T) {
-	chunks := []ragResult{{Text: "Cooksy is a recipe app.", Score: 0.95}}
+	chunks := []rag.Result{{Text: "Cooksy is a recipe app.", Score: 0.95}}
 	msgs, err := buildRAGPrompt(chunks, "What is Cooksy?", "creative")
 	if err != nil {
 		t.Fatalf("buildRAGPrompt creative: %v", err)
@@ -56,7 +58,7 @@ func TestBuildRAGPromptCreative(t *testing.T) {
 
 // TestBuildRAGPromptEmptyChunks verifies handling of empty chunk list.
 func TestBuildRAGPromptEmptyChunks(t *testing.T) {
-	msgs, err := buildRAGPrompt([]ragResult{}, "Empty test", "strict")
+	msgs, err := buildRAGPrompt([]rag.Result{}, "Empty test", "strict")
 	if err != nil {
 		t.Fatalf("buildRAGPrompt empty: %v", err)
 	}

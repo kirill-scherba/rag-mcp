@@ -22,8 +22,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 
-	"github.com/kirill-scherba/keyvalembd"
 	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -42,6 +42,10 @@ const (
 
 // clientMode holds the current client mode (set at startup, readable globally).
 var clientMode ClientMode
+
+// mu serializes tool handlers so the single rag.Store is accessed one call at a
+// time (MCP requests may otherwise interleave over the stdio stream).
+var mu sync.Mutex
 
 // streamAnswerToStderr enables legacy token streaming through stderr.
 // It is off by default because MCP clients may not drain stderr pipes.
@@ -112,21 +116,12 @@ func main() {
 		log.Fatalf("Could not create database directory %s: %v", dir, err)
 	}
 
-	// Initialize keyvalembd (libSQL + Ollama embeddings)
-	kv, err := keyvalembd.New(*dbPath)
+	// Initialize the RAG engine (keyvalembd storage + keyword index)
+	store, err := rag.Open(*dbPath)
 	if err != nil {
-		log.Fatalf("Failed to initialize keyvalembd: %v", err)
+		log.Fatalf("Failed to initialize rag store: %v", err)
 	}
-	defer kv.Close()
-
-	// Keyword search uses a separate read connection to the same database.
-	ti, terr := rag.OpenTextIndex(*dbPath)
-	if terr != nil {
-		log.Printf("⚠️  text search unavailable: %v", terr)
-	}
-	if ti != nil {
-		defer ti.Close()
-	}
+	defer store.Close()
 
 	log.Printf("🚀 Starting rag-mcp server")
 	log.Printf("   DB path: %s", *dbPath)
@@ -157,7 +152,7 @@ Available tools:
 	)
 
 	// Register all tools
-	s.AddTools(tools(s, kv, ti)...)
+	s.AddTools(tools(s, store)...)
 
 	log.Printf("✅ Registered 8 tools")
 

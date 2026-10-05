@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirill-scherba/keyvalembd"
 	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -22,7 +21,7 @@ import (
 
 // ragIngestTool ingests (saves) a document: chunks text, embeds, stores.
 // Provide either 'text' (inline content) or 'file_path' (path to file on disk).
-func ragIngestTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+func ragIngestTool(store *rag.Store) server.ServerTool {
 	opt := mcp.NewTool("rag_ingest",
 		mcp.WithDescription(`Ingest a document into the RAG knowledge base.
 Splits the text into chunks, generates embeddings for each chunk,
@@ -52,64 +51,36 @@ otherwise the file is read as text.`),
 			defer mu.Unlock()
 			args := request.GetArguments()
 			key, _ := args["key"].(string)
+			filePath, _ := args["file_path"].(string)
+			text, _ := args["text"].(string)
+			description, _ := args["description"].(string)
 
-			var text string
-			if filePath, ok := args["file_path"].(string); ok && filePath != "" {
-				extracted, err := rag.ExtractFileText(ctx, filePath)
-				if err != nil {
-					return mcp.NewToolResultText(fmt.Sprintf(
-						"Error extracting file %q: %v", filePath, err)), nil
-				}
-				text = extracted
-			} else if t, ok := args["text"].(string); ok {
-				text = t
-			}
-
-			if key == "" || text == "" {
+			if key == "" || (filePath == "" && text == "") {
 				return mcp.NewToolResultText("Error: key and either text or file_path are required"), nil
 			}
 
-			description, _ := args["description"].(string)
-			if description == "" {
-				description = rag.Description(text, 150)
+			var (
+				stats rag.IngestStats
+				err   error
+			)
+			if filePath != "" {
+				stats, err = store.IngestFile(ctx, key, filePath, description)
+			} else {
+				stats, err = store.Ingest(ctx, key, text, "", description)
 			}
-
-			chunks := rag.Chunk(text)
-			if len(chunks) == 0 {
-				return mcp.NewToolResultText("Error: no chunks generated from text"), nil
-			}
-
-			deletedOld, err := deleteOldChunks(ctx, kv, key)
 			if err != nil {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Error deleting old chunks for %q: %v", key, err)), nil
+				return mcp.NewToolResultText(fmt.Sprintf("Error ingesting %q: %v", key, err)), nil
 			}
 
-			results, err := storeChunks(ctx, kv, key, chunks, "")
-			if err != nil {
-				return mcp.NewToolResultText(err.Error()), nil
-			}
-
-			if err := storeMeta(ctx, kv, key, docMeta{
-				Description: description,
-				NumChunks:   len(chunks),
-				Stored:      time.Now().UTC().Format(time.RFC3339),
-			}); err != nil {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Warning: chunks stored but metadata save failed: %v", err)), nil
-			}
-
-			out := fmt.Sprintf("Ingested %d chunks (replaced %d old):\n", len(chunks), deletedOld)
-			out += fmt.Sprintf("  meta: %s\n", metaKey(key))
-			out += fmt.Sprintf("  description: %s\n", description)
-			out += strings.Join(results, "\n")
+			out := fmt.Sprintf("Ingested %q: %d chunks (replaced %d)\n", key, stats.NumChunks, stats.DeletedOld)
+			out += fmt.Sprintf("  description: %s\n", stats.Description)
 			return mcp.NewToolResultText(out), nil
 		},
 	}
 }
 
 // ragIngestDirectoryTool ingests all files matching a pattern in a directory.
-func ragIngestDirectoryTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+func ragIngestDirectoryTool(store *rag.Store) server.ServerTool {
 	opt := mcp.NewTool("rag_ingest_directory",
 		mcp.WithDescription(`Ingest all documents from a directory into the RAG knowledge base.
 Scans the directory for matching files (default: *.md,*.txt) and ingests each one.
@@ -167,47 +138,17 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 			var fileResults []string
 			totalChunks := 0
 			for _, filePath := range files {
-				fileText, err := rag.ExtractFileText(ctx, filePath)
-				if err != nil {
-					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: %v", filePath, err))
-					continue
-				}
-
 				baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 				docKey := keyPrefix + "/" + baseName
 
-				chunks := rag.Chunk(fileText)
-				if len(chunks) == 0 {
-					fileResults = append(fileResults, fmt.Sprintf("  ⚠️  %s: no chunks generated", filePath))
-					continue
-				}
-
-				deletedOld, err := deleteOldChunks(ctx, kv, docKey)
-				if err != nil {
-					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: error deleting old chunks: %v", filePath, err))
-					continue
-				}
-
-				description := rag.Description(fileText, 150)
-
-				_, err = storeChunks(ctx, kv, docKey, chunks, filePath)
+				stats, err := store.IngestFile(ctx, docKey, filePath, "")
 				if err != nil {
 					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: %v", filePath, err))
 					continue
 				}
-
-				if err := storeMeta(ctx, kv, docKey, docMeta{
-					Description: description,
-					NumChunks:   len(chunks),
-					Source:      filePath,
-					Stored:      time.Now().UTC().Format(time.RFC3339),
-				}); err != nil {
-					fileResults = append(fileResults, fmt.Sprintf("  ⚠️  %s: meta save failed: %v", filePath, err))
-					continue
-				}
-
-				totalChunks += len(chunks)
-				fileResults = append(fileResults, fmt.Sprintf("  ✅ %s → %s (%d chunks, replaced %d)", filePath, docKey, len(chunks), deletedOld))
+				totalChunks += stats.NumChunks
+				fileResults = append(fileResults, fmt.Sprintf(
+					"  ✅ %s → %s (%d chunks, replaced %d)", filePath, docKey, stats.NumChunks, stats.DeletedOld))
 			}
 
 			out := fmt.Sprintf("Ingested %d files (%d total chunks):\n", len(files), totalChunks)
@@ -218,7 +159,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 }
 
 // ragIngestUrlTool fetches a URL and ingests its content as a document.
-func ragIngestUrlTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+func ragIngestUrlTool(store *rag.Store) server.ServerTool {
 	opt := mcp.NewTool("rag_ingest_url",
 		mcp.WithDescription(`Fetch a URL and ingest its content into the RAG knowledge base.
 Downloads the content via HTTP GET, chunks it, generates embeddings,
@@ -284,39 +225,13 @@ If key is empty, auto-generates from the URL path.`),
 					"Error: empty content from %q", urlStr)), nil
 			}
 
-			chunks := rag.Chunk(text)
-			if len(chunks) == 0 {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Error: no chunks generated from %q", urlStr)), nil
-			}
-
-			deletedOld, err := deleteOldChunks(ctx, kv, docKey)
+			stats, err := store.Ingest(ctx, docKey, text, urlStr, "")
 			if err != nil {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Error deleting old chunks for %q: %v", docKey, err)), nil
+				return mcp.NewToolResultText(fmt.Sprintf("Error ingesting %q: %v", docKey, err)), nil
 			}
 
-			description := rag.Description(text, 150)
-
-			results, err := storeChunks(ctx, kv, docKey, chunks, urlStr)
-			if err != nil {
-				return mcp.NewToolResultText(err.Error()), nil
-			}
-
-			if err := storeMeta(ctx, kv, docKey, docMeta{
-				Description: description,
-				NumChunks:   len(chunks),
-				Source:      urlStr,
-				Stored:      time.Now().UTC().Format(time.RFC3339),
-			}); err != nil {
-				return mcp.NewToolResultText(fmt.Sprintf(
-					"Warning: chunks stored but metadata save failed: %v", err)), nil
-			}
-
-			out := fmt.Sprintf("Ingested %q as %s (%d chunks, replaced %d):\n", urlStr, docKey, len(chunks), deletedOld)
-			out += fmt.Sprintf("  meta: %s\n", metaKey(docKey))
-			out += fmt.Sprintf("  description: %s\n", description)
-			out += strings.Join(results, "\n")
+			out := fmt.Sprintf("Ingested %q as %s (%d chunks, replaced %d):\n", urlStr, docKey, stats.NumChunks, stats.DeletedOld)
+			out += fmt.Sprintf("  description: %s\n", stats.Description)
 			return mcp.NewToolResultText(out), nil
 		},
 	}

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -17,7 +17,7 @@ import (
 // ragQueryTool answers a question using RAG: semantic search + LLM generation.
 // Sends progress notifications to the client so the user can see real-time
 // status updates via the MCP progress bar.
-func ragQueryTool(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+func ragQueryTool(srv *server.MCPServer, store *rag.Store) server.ServerTool {
 	opt := mcp.NewTool("rag_query",
 		mcp.WithDescription(`Answer a question using the RAG knowledge base.
 Performs semantic search across ingested documents and generates
@@ -65,7 +65,6 @@ an answer using the LLM.`),
 			case ClientModeAuto:
 				useStream = hasProgressToken
 			}
-
 			isStreamMode := useStream
 
 			var progressToken mcp.ProgressToken
@@ -87,9 +86,7 @@ an answer using the LLM.`),
 			}
 
 			sendProgress(0, 100, "🔍 Searching knowledge base...")
-			searchResults, err := withEmbedderRetry(ctx, func() ([]keyvalembd.SearchResult, error) {
-				return kv.SearchSemantic(question, topK)
-			})
+			searchResults, err := store.Search(ctx, question, topK)
 			if err != nil {
 				sendProgress(100, 100, "❌ Search failed")
 				return mcp.NewToolResultText(fmt.Sprintf(
@@ -103,14 +100,7 @@ an answer using the LLM.`),
 
 			sendProgress(30, 100, fmt.Sprintf("📄 Found %d relevant fragments, generating answer...", len(searchResults)))
 
-			var chunks []ragResult
-			for _, sr := range searchResults {
-				chunks = append(chunks, ragResult{
-					Key:   sr.Key,
-					Text:  sr.Text,
-					Score: sr.Score,
-				})
-			}
+			chunks := searchResults
 
 			var chunkSummary []string
 			for _, ch := range chunks {

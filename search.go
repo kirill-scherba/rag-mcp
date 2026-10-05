@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -18,7 +18,7 @@ import (
 // matching chunks with similarity scores. No LLM generation is performed,
 // making it useful for debugging embedding quality and for other MCP tools
 // that need raw search results.
-func ragSearchTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
+func ragSearchTool(store *rag.Store) server.ServerTool {
 	opt := mcp.NewTool("rag_search",
 		mcp.WithDescription(`Search the RAG knowledge base for relevant chunks.
 Performs semantic search and returns the most similar chunks with their scores
@@ -56,9 +56,7 @@ debugging embedding quality or when another tool needs raw search results.`),
 				topK = 5
 			}
 
-			searchResults, err := withEmbedderRetry(ctx, func() ([]keyvalembd.SearchResult, error) {
-				return kv.SearchSemantic(query, topK)
-			})
+			searchResults, err := store.Search(ctx, query, topK)
 			if err != nil {
 				return mcp.NewToolResultText(fmt.Sprintf(
 					"Search error: %v\nTip: Ensure Ollama is running and has the embedding model installed.", err)), nil
@@ -71,9 +69,8 @@ debugging embedding quality or when another tool needs raw search results.`),
 			var out strings.Builder
 			out.WriteString(fmt.Sprintf("Search results for %q (%d found):\n\n", query, len(searchResults)))
 			for i, sr := range searchResults {
-				text := sr.Text
-				preview := text
-				if runes := []rune(text); len(runes) > 120 {
+				preview := sr.Text
+				if runes := []rune(preview); len(runes) > 120 {
 					preview = string(runes[:120]) + "…"
 				}
 				out.WriteString(fmt.Sprintf("%d. [score: %.4f] %s\n   %s\n",

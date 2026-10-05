@@ -165,9 +165,9 @@ architecture with Go backend services communicating via gRPC.`
 	}
 
 	// Generate answer via LLM
-	var chunksForPrompt []ragResult
+	var chunksForPrompt []rag.Result
 	for _, sr := range searchResults {
-		chunksForPrompt = append(chunksForPrompt, ragResult{
+		chunksForPrompt = append(chunksForPrompt, rag.Result{
 			Key:   sr.Key,
 			Text:  sr.Text,
 			Score: sr.Score,

@@ -14,6 +14,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/kirill-scherba/rag-mcp/rag"
 )
 
 // Default LLM models and Ollama settings.
@@ -65,7 +67,7 @@ func boolPtr(b bool) *bool { return &b }
 // buildRAGPrompt constructs the LLM chat messages with system instruction,
 // context chunks and the user's question.
 // style can be "strict" (copy-paste of exact signatures) or "creative" (free-form answer).
-func buildRAGPrompt(chunks []ragResult, question, style string) ([]OllamaChatMessage, error) {
+func buildRAGPrompt(chunks []rag.Result, question, style string) ([]OllamaChatMessage, error) {
 	var contextParts []string
 	for i, ch := range chunks {
 		contextParts = append(contextParts, fmt.Sprintf(
