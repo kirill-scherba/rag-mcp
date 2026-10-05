@@ -27,6 +27,7 @@
 | 2026-10-04 | Fix answer model to `deepseek-v4.1-flash:cloud` (old name retired) | ✅ Done |
 | 2026-10-04 | Add `rag_find` — keyword search + `rag-cli find` | ✅ Done |
 | 2026-10-04 | Unicode case-insensitive keyword search (`ucontains()` SQL function) | ✅ Done |
+| 2026-10-05 | G1a: extract the pure core into package `rag` (chunker, keyword search, extractor); main uses it | ✅ Done |
 
 ## Current State
 

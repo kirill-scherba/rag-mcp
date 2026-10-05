@@ -12,12 +12,13 @@ import (
 	"strings"
 
 	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // tools returns all MCP tools for rag-mcp.
-func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd, ti *textIndex) []server.ServerTool {
+func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd, ti *rag.TextIndex) []server.ServerTool {
 	return []server.ServerTool{
 		ragIngestTool(kv),
 		ragIngestDirectoryTool(kv),
@@ -32,7 +33,7 @@ func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd, ti *textIndex) []
 
 // ragFindTool performs exact keyword (SQL LIKE) search, complementing the
 // semantic rag_search. It needs no embeddings and works with Ollama down.
-func ragFindTool(ti *textIndex) server.ServerTool {
+func ragFindTool(ti *rag.TextIndex) server.ServerTool {
 	opt := mcp.NewTool("rag_find",
 		mcp.WithDescription(`Exact keyword search across the knowledge base.
 Complements rag_search (semantic): use it for an exact word or phrase —
@@ -65,7 +66,7 @@ Case-insensitive for the whole Unicode range.`),
 				limit = int(v)
 			}
 
-			results, err := ti.find(keyword, limit)
+			results, err := ti.Find(keyword, limit)
 			if err != nil {
 				return mcp.NewToolResultText(fmt.Sprintf("Error: %v", err)), nil
 			}

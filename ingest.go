@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -54,7 +55,7 @@ otherwise the file is read as text.`),
 
 			var text string
 			if filePath, ok := args["file_path"].(string); ok && filePath != "" {
-				extracted, err := extractFileText(ctx, filePath)
+				extracted, err := rag.ExtractFileText(ctx, filePath)
 				if err != nil {
 					return mcp.NewToolResultText(fmt.Sprintf(
 						"Error extracting file %q: %v", filePath, err)), nil
@@ -70,10 +71,10 @@ otherwise the file is read as text.`),
 
 			description, _ := args["description"].(string)
 			if description == "" {
-				description = generateDescription(text, 150)
+				description = rag.Description(text, 150)
 			}
 
-			chunks := chunkTextSemantic(text)
+			chunks := rag.Chunk(text)
 			if len(chunks) == 0 {
 				return mcp.NewToolResultText("Error: no chunks generated from text"), nil
 			}
@@ -166,7 +167,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 			var fileResults []string
 			totalChunks := 0
 			for _, filePath := range files {
-				fileText, err := extractFileText(ctx, filePath)
+				fileText, err := rag.ExtractFileText(ctx, filePath)
 				if err != nil {
 					fileResults = append(fileResults, fmt.Sprintf("  ❌ %s: %v", filePath, err))
 					continue
@@ -175,7 +176,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 				baseName := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 				docKey := keyPrefix + "/" + baseName
 
-				chunks := chunkTextSemantic(fileText)
+				chunks := rag.Chunk(fileText)
 				if len(chunks) == 0 {
 					fileResults = append(fileResults, fmt.Sprintf("  ⚠️  %s: no chunks generated", filePath))
 					continue
@@ -187,7 +188,7 @@ Document key is '<key_prefix>/<filename_without_ext>'.`),
 					continue
 				}
 
-				description := generateDescription(fileText, 150)
+				description := rag.Description(fileText, 150)
 
 				_, err = storeChunks(ctx, kv, docKey, chunks, filePath)
 				if err != nil {
@@ -283,7 +284,7 @@ If key is empty, auto-generates from the URL path.`),
 					"Error: empty content from %q", urlStr)), nil
 			}
 
-			chunks := chunkTextSemantic(text)
+			chunks := rag.Chunk(text)
 			if len(chunks) == 0 {
 				return mcp.NewToolResultText(fmt.Sprintf(
 					"Error: no chunks generated from %q", urlStr)), nil
@@ -295,7 +296,7 @@ If key is empty, auto-generates from the URL path.`),
 					"Error deleting old chunks for %q: %v", docKey, err)), nil
 			}
 
-			description := generateDescription(text, 150)
+			description := rag.Description(text, 150)
 
 			results, err := storeChunks(ctx, kv, docKey, chunks, urlStr)
 			if err != nil {

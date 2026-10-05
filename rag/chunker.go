@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package rag
 
 import (
 	"strings"
@@ -105,10 +105,10 @@ func (it *sentenceIter) next() (int, int, bool) {
 	return start, it.pos, false
 }
 
-// chunkTextSemantic splits text into semantically meaningful chunks.
-// It splits by sentences, groups them until targetChunkSize is reached,
-// and preserves overlapSentences from the previous chunk for context continuity.
-func chunkTextSemantic(text string) []string {
+// Chunk splits text into semantically meaningful chunks. It splits by sentences,
+// groups them until targetChunkSize is reached, and preserves overlapSentences
+// from the previous chunk for context continuity.
+func Chunk(text string) []string {
 	// Normalize line endings
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
@@ -234,10 +234,10 @@ func chunkTextSemantic(text string) []string {
 	return chunks
 }
 
-// generateDescription creates a short description from text.
-// It takes the first up to maxLen characters, breaking at a word boundary.
-// If the text is shorter than maxLen, returns it trimmed.
-func generateDescription(text string, maxLen int) string {
+// Description creates a short description from text. It takes the first up to
+// maxLen characters, breaking at a word boundary. If the text is shorter than
+// maxLen, it is returned trimmed.
+func Description(text string, maxLen int) string {
 	if maxLen <= 0 {
 		maxLen = 150
 	}

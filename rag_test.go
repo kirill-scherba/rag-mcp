@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/rag-mcp/rag"
 )
 
 // TestChunkText tests the chunking logic with various inputs.
@@ -57,9 +58,9 @@ Third paragraph covering deployment and configuration options.`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := chunkTextSemantic(tt.input)
+			got := rag.Chunk(tt.input)
 			if len(got) < tt.wantMin {
-				t.Errorf("chunkTextSemantic() = %d chunks, want >= %d", len(got), tt.wantMin)
+				t.Errorf("rag.Chunk() = %d chunks, want >= %d", len(got), tt.wantMin)
 			}
 			// Verify no extraneous whitespace in chunks
 			for i, c := range got {
@@ -108,7 +109,7 @@ architecture with Go backend services communicating via gRPC.`
 	// ─── Ingest ────────────────────────────────────────────────────────────────
 
 	t.Log("📥 Ingesting document...")
-	chunks := chunkTextSemantic(docText)
+	chunks := rag.Chunk(docText)
 	if len(chunks) == 0 {
 		t.Fatal("no chunks generated from document")
 	}

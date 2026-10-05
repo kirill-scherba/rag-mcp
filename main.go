@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 
 	"github.com/kirill-scherba/keyvalembd"
+	"github.com/kirill-scherba/rag-mcp/rag"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -119,7 +120,7 @@ func main() {
 	defer kv.Close()
 
 	// Keyword search uses a separate read connection to the same database.
-	ti, terr := openTextIndex(*dbPath)
+	ti, terr := rag.OpenTextIndex(*dbPath)
 	if terr != nil {
 		log.Printf("⚠️  text search unavailable: %v", terr)
 	}

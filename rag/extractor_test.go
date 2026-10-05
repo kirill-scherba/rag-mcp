@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package rag
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func TestExtractWithoutCommandReadsRaw(t *testing.T) {
 	if err := os.WriteFile(path, []byte("plain text\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got, err := extractFileText(context.Background(), path)
+	got, err := ExtractFileText(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestExtractWithCommand(t *testing.T) {
 	script := writeScript(t, dir, `echo "EXTRACTED:"; cat "$1"`)
 	t.Setenv(extractorCmdEnv, script)
 
-	got, err := extractFileText(context.Background(), doc)
+	got, err := ExtractFileText(context.Background(), doc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestExtractWithPlaceholder(t *testing.T) {
 	script := writeScript(t, dir, `echo "GOT:$1"`)
 	t.Setenv(extractorCmdEnv, script+" {file}")
 
-	got, err := extractFileText(context.Background(), doc)
+	got, err := ExtractFileText(context.Background(), doc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestExtractCommandFailure(t *testing.T) {
 	}
 	t.Setenv(extractorCmdEnv, "false") // exits non-zero
 
-	if _, err := extractFileText(context.Background(), doc); err == nil {
+	if _, err := ExtractFileText(context.Background(), doc); err == nil {
 		t.Fatal("expected an error from a failing extractor")
 	}
 }

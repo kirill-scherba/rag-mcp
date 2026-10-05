@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package rag
 
 import (
 	"bytes"
@@ -35,9 +35,9 @@ const (
 
 const defaultExtractorTimeout = 10 * time.Minute
 
-// extractFileText turns a file into text. With EXTRACTOR_CMD set the command
+// ExtractFileText turns a file into text. With EXTRACTOR_CMD set the command
 // does the extraction; otherwise the file is read as text.
-func extractFileText(ctx context.Context, path string) (string, error) {
+func ExtractFileText(ctx context.Context, path string) (string, error) {
 	cmdTemplate := strings.TrimSpace(os.Getenv(extractorCmdEnv))
 	if cmdTemplate == "" {
 		data, err := os.ReadFile(path)

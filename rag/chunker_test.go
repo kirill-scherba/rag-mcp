@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package rag
 
 import (
 	"strings"
 	"testing"
 )
 
-// TestChunkTextSemanticEmpty verifies empty and whitespace-only input.
-func TestChunkTextSemanticEmpty(t *testing.T) {
+// TestChunkEmpty verifies empty and whitespace-only input.
+func TestChunkEmpty(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -22,18 +22,18 @@ func TestChunkTextSemanticEmpty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := chunkTextSemantic(tt.input)
+			got := Chunk(tt.input)
 			if len(got) != tt.want {
-				t.Errorf("chunkTextSemantic(%q) returned %d chunks, want %d", tt.input, len(got), tt.want)
+				t.Errorf("Chunk(%q) returned %d chunks, want %d", tt.input, len(got), tt.want)
 			}
 		})
 	}
 }
 
-// TestChunkTextSemanticSingleParagraph verifies single paragraph handling.
-func TestChunkTextSemanticSingleParagraph(t *testing.T) {
+// TestChunkSingleParagraph verifies single paragraph handling.
+func TestChunkSingleParagraph(t *testing.T) {
 	input := "This is a single paragraph of text that should be long enough to form one chunk."
-	got := chunkTextSemantic(input)
+	got := Chunk(input)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 chunk, got %d", len(got))
 	}
@@ -42,14 +42,14 @@ func TestChunkTextSemanticSingleParagraph(t *testing.T) {
 	}
 }
 
-// TestChunkTextSemanticMultipleParagraphs verifies multi-paragraph input.
-func TestChunkTextSemanticMultipleParagraphs(t *testing.T) {
+// TestChunkMultipleParagraphs verifies multi-paragraph input.
+func TestChunkMultipleParagraphs(t *testing.T) {
 	input := `First paragraph about Cooksy platform features and capabilities.
 
 Second paragraph discussing architecture and design decisions.
 
 Third paragraph covering deployment and configuration options.`
-	got := chunkTextSemantic(input)
+	got := Chunk(input)
 	if len(got) < 1 {
 		t.Fatalf("expected at least 1 chunk, got %d", len(got))
 	}
@@ -60,10 +60,10 @@ Third paragraph covering deployment and configuration options.`
 	}
 }
 
-// TestChunkTextSemanticShortText verifies very short input (< minChunkSize).
-func TestChunkTextSemanticShortText(t *testing.T) {
+// TestChunkShortText verifies very short input (< minChunkSize).
+func TestChunkShortText(t *testing.T) {
 	input := "Short."
-	got := chunkTextSemantic(input)
+	got := Chunk(input)
 	if len(got) != 1 {
 		t.Errorf("expected 1 chunk for short text, got %d", len(got))
 	}
@@ -72,23 +72,22 @@ func TestChunkTextSemanticShortText(t *testing.T) {
 	}
 }
 
-// TestChunkTextSemanticWindowsLineEndings verifies CRLF normalization.
-func TestChunkTextSemanticWindowsLineEndings(t *testing.T) {
+// TestChunkWindowsLineEndings verifies CRLF normalization.
+func TestChunkWindowsLineEndings(t *testing.T) {
 	input := "Line one.\r\n\r\nLine two."
-	got := chunkTextSemantic(input)
+	got := Chunk(input)
 	if len(got) < 1 {
 		t.Fatalf("expected at least 1 chunk, got %d", len(got))
 	}
 }
 
-// TestChunkTextSemanticUnicode verifies emoji and multi-byte characters.
-func TestChunkTextSemanticUnicode(t *testing.T) {
+// TestChunkUnicode verifies emoji and multi-byte characters.
+func TestChunkUnicode(t *testing.T) {
 	input := "Hello world! 😀 This is a test with emoji. 🚀 Another sentence here."
-	got := chunkTextSemantic(input)
+	got := Chunk(input)
 	if len(got) < 1 {
 		t.Fatalf("expected at least 1 chunk, got %d", len(got))
 	}
-	// Verify all chunks are non-empty
 	for i, c := range got {
 		if strings.TrimSpace(c) == "" {
 			t.Errorf("chunk %d is empty", i)
@@ -96,28 +95,23 @@ func TestChunkTextSemanticUnicode(t *testing.T) {
 	}
 }
 
-// TestChunkTextSemanticLargeDoc generates enough text to trigger multiple chunks.
-func TestChunkTextSemanticLargeDoc(t *testing.T) {
-	// Build a ~4000 character text with ~20 sentences
+// TestChunkLargeDoc generates enough text to trigger multiple chunks.
+func TestChunkLargeDoc(t *testing.T) {
 	var parts []string
 	for i := 0; i < 40; i++ {
 		parts = append(parts, "This is sentence number %d in our large document. It contains enough words to be meaningful.")
 	}
 	input := strings.Join(parts, " ")
-	got := chunkTextSemantic(input)
-	// Should produce multiple chunks since total > maxChunkSize (2000)
+	got := Chunk(input)
 	if len(got) < 2 {
 		t.Errorf("expected multiple chunks for large doc, got %d", len(got))
 	}
-	// Verify overlap: adjacent chunks should share some content (last 2 sentences)
 	if len(got) > 1 {
-		// Adjacent chunks should have some overlap
 		overlapFound := false
 		for i := 0; i < len(got)-1; i++ {
 			words1 := strings.Fields(got[i])
 			words2 := strings.Fields(got[i+1])
 			if len(words1) > 0 && len(words2) > 0 {
-				// Check if last few words of chunk i appear in chunk i+1
 				lastWord := words1[len(words1)-1]
 				if strings.Contains(got[i+1], lastWord) {
 					overlapFound = true
@@ -130,12 +124,10 @@ func TestChunkTextSemanticLargeDoc(t *testing.T) {
 	}
 }
 
-// TestChunkTextSemanticDedupe verifies deduplication of consecutive identical chunks.
-func TestChunkTextSemanticDedupe(t *testing.T) {
-	// A tiny document where overlap might create identical consecutive chunks
+// TestChunkDedupe verifies deduplication of consecutive identical chunks.
+func TestChunkDedupe(t *testing.T) {
 	input := "A. B. C. D. E. F. G. H. I. J. K. L. M. N. O. P. Q. R. S. T. U. V. W. X. Y. Z."
-	got := chunkTextSemantic(input)
-	// Check no two consecutive chunks are identical
+	got := Chunk(input)
 	for i := 0; i < len(got)-1; i++ {
 		if got[i] == got[i+1] {
 			t.Errorf("chunks %d and %d are identical after dedup: %q", i, i+1, got[i])
@@ -187,8 +179,8 @@ func TestSentenceIter(t *testing.T) {
 	}
 }
 
-// TestGenerateDescription verifies description generation.
-func TestGenerateDescription(t *testing.T) {
+// TestDescription verifies description generation.
+func TestDescription(t *testing.T) {
 	tests := []struct {
 		name   string
 		text   string
@@ -205,9 +197,9 @@ func TestGenerateDescription(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := generateDescription(tt.text, tt.maxLen)
+			got := Description(tt.text, tt.maxLen)
 			if got != tt.want {
-				t.Errorf("generateDescription(%q, %d) = %q, want %q", tt.text, tt.maxLen, got, tt.want)
+				t.Errorf("Description(%q, %d) = %q, want %q", tt.text, tt.maxLen, got, tt.want)
 			}
 		})
 	}

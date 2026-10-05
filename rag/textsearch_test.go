@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package rag
 
 import (
 	"database/sql"
@@ -41,14 +41,14 @@ func TestTextIndexFind(t *testing.T) {
 		}
 	}
 
-	ti, err := openTextIndex(dbPath)
+	ti, err := OpenTextIndex(dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ti.Close()
 
 	// Cyrillic keyword, exact case.
-	res, err := ti.find("Золотая Вобла", 10)
+	res, err := ti.Find("Золотая Вобла", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestTextIndexFind(t *testing.T) {
 
 	// Cyrillic is case-insensitive too (ucontains).
 	for _, q := range []string{"золотая вобла", "ЗОЛОТАЯ ВОБЛА", "вОбЛа"} {
-		res, err = ti.find(q, 10)
+		res, err = ti.Find(q, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func TestTextIndexFind(t *testing.T) {
 	}
 
 	// ASCII keyword is case-insensitive.
-	res, err = ti.find("COFFEE", 10)
+	res, err = ti.Find("COFFEE", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestTextIndexFind(t *testing.T) {
 	}
 
 	// No match.
-	res, err = ti.find("нет-такого-слова", 10)
+	res, err = ti.Find("нет-такого-слова", 10)
 	if err != nil {
 		t.Fatal(err)
 	}

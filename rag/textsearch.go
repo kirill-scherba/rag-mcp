@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package rag
 
 import (
 	"database/sql"
@@ -14,10 +14,10 @@ import (
 	"modernc.org/sqlite"
 )
 
-// textIndex provides exact keyword (SQL LIKE) search over the same database,
-// complementing semantic search. It owns a separate read connection so the
-// keyvalembd handle stays untouched.
-type textIndex struct {
+// TextIndex provides exact keyword (Unicode case-insensitive) search over a
+// RAG database. It owns a separate read connection so the keyvalembd handle
+// stays untouched.
+type TextIndex struct {
 	db *sql.DB
 }
 
@@ -50,8 +50,8 @@ func registerUnicodeFunctions() error {
 	return err
 }
 
-// openTextIndex opens a connection to the database for keyword search.
-func openTextIndex(dbPath string) (*textIndex, error) {
+// OpenTextIndex opens a connection to the database for keyword search.
+func OpenTextIndex(dbPath string) (*TextIndex, error) {
 	if err := registerUnicodeFunctions(); err != nil {
 		return nil, fmt.Errorf("register sqlite functions: %w", err)
 	}
@@ -64,26 +64,26 @@ func openTextIndex(dbPath string) (*textIndex, error) {
 		db.Close()
 		return nil, fmt.Errorf("ping text index: %w", err)
 	}
-	return &textIndex{db: db}, nil
+	return &TextIndex{db: db}, nil
 }
 
 // Close releases the read connection.
-func (t *textIndex) Close() {
+func (t *TextIndex) Close() {
 	if t != nil && t.db != nil {
 		_ = t.db.Close()
 	}
 }
 
-// findResult is a single keyword-search hit.
-type findResult struct {
+// FindResult is a single keyword-search hit.
+type FindResult struct {
 	Key  string
 	Text string
 }
 
-// find searches keys and values with a Unicode-aware case-insensitive
+// Find searches keys and values with a Unicode-aware case-insensitive
 // substring match (ucontains). Chunk text lives in kv_embeddings (plain text);
 // document descriptions live in kv_data under "/meta" keys.
-func (t *textIndex) find(keyword string, limit int) ([]findResult, error) {
+func (t *TextIndex) Find(keyword string, limit int) ([]FindResult, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -106,13 +106,13 @@ func (t *textIndex) find(keyword string, limit int) ([]findResult, error) {
 	}
 	defer rows.Close()
 
-	var results []findResult
+	var results []FindResult
 	for rows.Next() {
 		var key, val string
 		if err := rows.Scan(&key, &val); err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
 		}
-		results = append(results, findResult{Key: key, Text: val})
+		results = append(results, FindResult{Key: key, Text: val})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows iteration: %w", err)
