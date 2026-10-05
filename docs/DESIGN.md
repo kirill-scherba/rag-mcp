@@ -12,7 +12,7 @@
          │                                    ▼
          │                          ┌─────────────────┐
          │                          │   keyvalembd     │
-         │                          │  (libSQL + vec)  │
+         │                          │ (SQLite+vecidx) │
          │                          └────────┬────────┘
          │                                   │
          │                                   ▼
@@ -35,17 +35,24 @@
 - **Deduplication** — removes consecutive identical chunks that can occur with tiny documents.
 
 ### 3. Tools (`tools.go`)
-- **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
-- **`rag_ingest_directory`**: Accepts `key_prefix`, `dir_path`, and optional `pattern` (default `*.md,*.txt`). Scans directory, reads each matching file, ingests with key `<key_prefix>/<filename>`.
+- **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). A file is converted with the `anytext/totext` library (text, DOCX/HTML/CSV, PDF, images via OCR). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
+- **`rag_ingest_directory`**: Accepts `key_prefix`, `dir_path`, and optional `pattern` (default `*.md,*.txt`). Scans directory, converts each matching file with `anytext/totext`, and ingests it under `<key_prefix>/<filename>`.
 - **`rag_ingest_url`**: Accepts `url` (required) and optional `key`. Fetches URL via HTTP GET, chunks and stores content. Auto-generates key from host+path if not provided.
 - **`rag_search`**: Accepts `query` text. Performs semantic search on stored chunks and returns the matching chunks with similarity scores and text previews. No LLM generation.
+- **`rag_find`**: Accepts `keyword` text. Exact keyword search (no embeddings) over chunk text and document descriptions, case-insensitive for the whole Unicode range. Complements `rag_search`.
 - **`rag_query`**: Accepts `question` text. Performs semantic search on stored chunks, builds RAG prompt, calls LLM. Returns combined answer.
 - **`rag_list`**: Lists document keys or chunks in the knowledge base. When listing a specific document, shows chunk metadata and the first 100 characters of each chunk's text (with graceful fallback to index-only for non-JSON chunk values).
 - **`rag_delete`**: Accepts `key` (document key prefix). Lists all chunks with that prefix and deletes them from keyvalembd. Returns deleted count.
 
-### 4. LLM Generation (`generate.go`)
+### 4. Keyword Search (`textsearch.go`)
+- Opens a separate read connection to the same database (the keyvalembd handle stays untouched).
+- Registers a deterministic SQLite scalar function `ucontains(haystack, needle)` backed by Go `strings.ToLower`, so matching folds the whole Unicode range — unlike SQLite's `LIKE`/`lower`, which fold ASCII only. Works with pure-Go `modernc.org/sqlite`; no CGO, no external extension.
+- Searches chunk text in `kv_embeddings` and document descriptions in `kv_data` under `/meta` keys. Full scan (no index); FTS5 is the planned upgrade if the corpus grows.
+
+### 5. LLM Generation (`generate.go`)
 - `buildRAGPrompt()` — formats context chunks + system instruction + user question into Ollama chat messages.
 - `generateAnswerStreamWithOptions()` — sends request to Ollama `/api/chat` endpoint with `stream: true`, aggregates NDJSON token chunks, and optionally emits tokens to stderr only when explicitly enabled.
+- The model is an Ollama identifier (`deepseek-v4.1-flash:cloud`, default) and is selectable via `LLM_MODEL` / `--model`; only `rag_query` uses the LLM.
 
 ## Data Flow: Query
 
@@ -85,7 +92,7 @@ Answer text returned to user
                                             ▼
                                   ┌─────────────────┐
                                   │   keyvalembd     │
-                                  │  (libSQL + vec)  │
+                                  │ (SQLite+vecidx) │
                                   └─────────────────┘
 ```
 
@@ -100,6 +107,8 @@ Answer text returned to user
   - `main.go` — root command, persistent flags (`--db`, `--model`)
   - `client.go` — MCP stdio client, auto-discovery, stderr proxy
   - `query.go` — `rag_query` wrapper with `--style` flag
+  - `search.go` — `rag_search` wrapper (semantic)
+  - `find.go` — `rag_find` wrapper (keyword)
   - `ingest.go` — subcommands: `text`, `file`, `dir`, `url`
   - `list.go` — `rag_list` wrapper
   - `delete.go` — `rag_delete` wrapper
@@ -109,6 +118,8 @@ Answer text returned to user
 | Command | Description |
 |---------|-------------|
 | `rag-cli query <question>` | Semantic search + LLM answer (tokens streamed to stderr) |
+| `rag-cli search <query>` | Semantic search without LLM (scores + previews) |
+| `rag-cli find <keyword>` | Exact keyword search (Unicode case-insensitive), no embeddings |
 | `rag-cli ingest text` | Ingest inline text (argument or stdin via `-`) |
 | `rag-cli ingest file` | Ingest a file from disk |
 | `rag-cli ingest dir` | Ingest all docs from a directory |
@@ -137,9 +148,10 @@ Since rag-mcp must be available to spawn, either:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Storage | keyvalembd (libSQL) | Embeddings in SQLite — no external vector DB needed |
+| Storage | keyvalembd v0.6.x (pure-Go `modernc.org/sqlite` + in-process `vecindex`) | Embeddings in SQLite; no CGO, no external vector DB; reads pre-v0.5 databases transparently |
 | Embeddings | Ollama embeddinggemma | Local embedding gen, no API keys |
-| LLM | Ollama phi4-mini | Local, small, free, moderate speed |
+| LLM | Ollama `deepseek-v4.1-flash:cloud` (default, selectable) | Provider-specific id; only `rag_query` uses it; override with `LLM_MODEL`/`--model` |
+| Keyword search | `rag_find` via a registered `ucontains()` SQL function | Exact match complements semantic search; case-insensitive across Unicode (Go `strings.ToLower`) |
 | Protocol | MCP JSON-RPC | Standard protocol for AI assistants |
 | Streaming | Always `stream: true` | Ollama may return NDJSON even with `stream: false` |
 | stderr token output | Disabled by default; enabled by `--stream-stderr` | Prevents blocked MCP clients when stderr is not drained; preserves rag-cli live token output |
@@ -214,6 +226,21 @@ Since rag-mcp must be available to spawn, either:
       "top_k": { "type": "number", "description": "Max results (default: 5, max: 20)" }
     },
     "required": ["query"]
+  }
+}
+```
+
+### rag_find
+```json
+{
+  "name": "rag_find",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "keyword": { "type": "string", "description": "Keyword or phrase (Unicode case-insensitive)" },
+      "limit":   { "type": "number", "description": "Max results (default: 20, max: 100)" }
+    },
+    "required": ["keyword"]
   }
 }
 ```

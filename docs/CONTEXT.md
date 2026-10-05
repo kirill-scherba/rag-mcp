@@ -12,17 +12,17 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 
 ## Key Features
 
-- **Document Ingestion** (`rag_ingest`): Split text into chunks, generate embeddings, store in libSQL.
+- **Document Ingestion** (`rag_ingest`): Split text into chunks, generate embeddings, store in SQLite.
 - **Semantic Search & QA** (`rag_query`): Find relevant chunks and answer questions via LLM.
 - **Raw Semantic Search** (`rag_search`): Search for relevant chunks and return them with similarity scores, without LLM generation.
-- **Exact Keyword Search** (`rag_find`): SQL LIKE search over chunk text and document descriptions; needs no embeddings and works with Ollama down (complements semantic search).
+- **Exact Keyword Search** (`rag_find`): Exact keyword search over chunk text and document descriptions; Unicode case-insensitive; needs no embeddings and works with Ollama down (complements semantic search).
 - **List Documents** (`rag_list`): List document keys or chunks in the knowledge base; detailed view shows chunk text previews.
 - **Document Deletion** (`rag_delete`): Remove documents and all their chunks.
 - **MCP Protocol**: JSON-RPC 2.0 over stdin/stdout — works with any MCP client.
 
 ## Integration
 
-- Uses [keyvalembd](https://github.com/kirill-scherba/keyvalembd) for libSQL-backed key-value store with vector embeddings.
+- Uses [keyvalembd](https://github.com/kirill-scherba/keyvalembd) v0.6.x for a pure-Go SQLite-backed key-value store with vector embeddings (`modernc.org/sqlite` + `vecindex`, no CGO).
 - Uses [anytext/totext](https://github.com/kirill-scherba/anytext) to turn any ingested file (text, DOCX, HTML, PDF, images) into text.
 - Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`deepseek-v4.1-flash:cloud`).
 - Runtime dependency licenses (Ollama MIT, embeddinggemma/Gemma terms, no CGO): see [LICENSING.md](LICENSING.md).

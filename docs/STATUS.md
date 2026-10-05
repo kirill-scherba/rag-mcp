@@ -25,7 +25,8 @@
 | 2026-10-04 | Ingest any supported file via anytext/totext | ✅ Done |
 | 2026-10-04 | Upgrade keyvalembd to v0.6.1 (pure-Go sqlite + vecindex); legacy DB read transparently; search parity verified on a prod-DB copy | ✅ Done |
 | 2026-10-04 | Fix answer model to `deepseek-v4.1-flash:cloud` (old name retired) | ✅ Done |
-| 2026-10-04 | Add `rag_find` — SQL LIKE keyword search + `rag-cli find` | ✅ Done |
+| 2026-10-04 | Add `rag_find` — keyword search + `rag-cli find` | ✅ Done |
+| 2026-10-04 | Unicode case-insensitive keyword search (`ucontains()` SQL function) | ✅ Done |
 
 ## Current State
 
@@ -37,7 +38,7 @@
   - `list`, `delete`
   - Auto-discovers `rag-mcp` binary (PATH, same dir, GOPATH/bin)
 - **LLM**: Uses Ollama `/api/chat` with `stream: true` for reliable NDJSON parsing
-- **Storage**: keyvalembd (libSQL + vector embeddings)
+- **Storage**: keyvalembd v0.6.x (pure-Go `modernc.org/sqlite` + `vecindex`; no CGO)
 - **Chunker**: Sentence-based semantic chunking with overlap (2 sentences) and target size 1200 chars (min 500, max 2000). Includes `generateDescription()` for auto doc descriptions.
 - **Runtime safety**: `rag_query` no longer writes answer tokens to stderr by default, preventing blocked MCP clients; embedding/search operations retry briefly while keyvalembd initializes its embedder
 - **Code structure**: Tools split into logical modules — `tools.go` (routing + list/delete), `ingest.go` (ingest tools using shared `storeChunks`), `query.go`, `metadata.go` (shared `storeChunks`, `storeMeta`, `deleteOldChunks`)
