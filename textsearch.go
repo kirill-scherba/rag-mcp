@@ -6,10 +6,12 @@ package main
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"strings"
+	"sync"
 
-	_ "modernc.org/sqlite" // pure-Go SQLite driver, same as keyvalembd
+	"modernc.org/sqlite"
 )
 
 // textIndex provides exact keyword (SQL LIKE) search over the same database,
@@ -19,8 +21,40 @@ type textIndex struct {
 	db *sql.DB
 }
 
+// registerOnce registers the Unicode-aware helpers on the sqlite driver. The
+// driver applies a registration to every connection opened afterwards.
+var registerOnce sync.Once
+
+func registerUnicodeFunctions() error {
+	var err error
+	registerOnce.Do(func() {
+		// ucontains(haystack, needle) reports whether haystack contains needle,
+		// case-insensitively for the whole Unicode range (Go strings.ToLower),
+		// unlike SQLite's LIKE/lower which fold ASCII only.
+		err = sqlite.RegisterDeterministicScalarFunction("ucontains", 2,
+			func(_ *sqlite.FunctionContext, args []driver.Value) (driver.Value, error) {
+				if len(args) != 2 {
+					return int64(0), nil
+				}
+				hay, _ := args[0].(string)
+				needle, _ := args[1].(string)
+				if needle == "" {
+					return int64(0), nil
+				}
+				if strings.Contains(strings.ToLower(hay), strings.ToLower(needle)) {
+					return int64(1), nil
+				}
+				return int64(0), nil
+			})
+	})
+	return err
+}
+
 // openTextIndex opens a connection to the database for keyword search.
 func openTextIndex(dbPath string) (*textIndex, error) {
+	if err := registerUnicodeFunctions(); err != nil {
+		return nil, fmt.Errorf("register sqlite functions: %w", err)
+	}
 	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)", dbPath)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -46,9 +80,9 @@ type findResult struct {
 	Text string
 }
 
-// find searches keys and values with SQL LIKE. SQLite LIKE is case-insensitive
-// for ASCII but case-sensitive for Unicode (Russian), so a variant with the
-// first letter uppercased is searched too — the same approach as memory_find.
+// find searches keys and values with a Unicode-aware case-insensitive
+// substring match (ucontains). Chunk text lives in kv_embeddings (plain text);
+// document descriptions live in kv_data under "/meta" keys.
 func (t *textIndex) find(keyword string, limit int) ([]findResult, error) {
 	if limit <= 0 {
 		limit = 20
@@ -57,41 +91,16 @@ func (t *textIndex) find(keyword string, limit int) ([]findResult, error) {
 		limit = 100
 	}
 
-	variants := []string{keyword}
-	if r := []rune(keyword); len(r) > 0 {
-		upper := string(append([]rune{uppercaseRune(r[0])}, r[1:]...))
-		if upper != keyword {
-			variants = append(variants, upper)
-		}
-	}
-
-	clauses := make([]string, 0, len(variants)*2)
-	metaClauses := make([]string, 0, len(variants)*2)
-	args := make([]any, 0, len(variants)*4+1)
-	for _, v := range variants {
-		p := "%" + v + "%"
-		clauses = append(clauses, "text LIKE ?", "key LIKE ?")
-		metaClauses = append(metaClauses, "key LIKE ?", "CAST(value AS TEXT) LIKE ?")
-		args = append(args, p, p)
-	}
-	for _, v := range variants {
-		p := "%" + v + "%"
-		args = append(args, p, p)
-	}
-	args = append(args, limit)
-
-	// Chunk text lives in kv_embeddings (plain text); document descriptions
-	// live in kv_data under "/meta" keys.
-	query := fmt.Sprintf(`
+	query := `
 		SELECT key, text AS val FROM kv_embeddings
-		WHERE %s
+		WHERE ucontains(text, ?) OR ucontains(key, ?)
 		UNION ALL
 		SELECT key, CAST(value AS TEXT) AS val FROM kv_data
-		WHERE key LIKE '%%/meta' AND (%s)
+		WHERE key LIKE '%/meta' AND (ucontains(key, ?) OR ucontains(CAST(value AS TEXT), ?))
 		ORDER BY key
-		LIMIT ?`, strings.Join(clauses, " OR "), strings.Join(metaClauses, " OR "))
+		LIMIT ?`
 
-	rows, err := t.db.Query(query, args...)
+	rows, err := t.db.Query(query, keyword, keyword, keyword, keyword, limit)
 	if err != nil {
 		return nil, fmt.Errorf("keyword search: %w", err)
 	}
@@ -109,10 +118,4 @@ func (t *textIndex) find(keyword string, limit int) ([]findResult, error) {
 		return nil, fmt.Errorf("rows iteration: %w", err)
 	}
 	return results, nil
-}
-
-// uppercaseRune uppercases a single rune without importing unicode tables at
-// call sites.
-func uppercaseRune(r rune) rune {
-	return []rune(strings.ToUpper(string(r)))[0]
 }

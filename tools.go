@@ -34,10 +34,10 @@ func tools(srv *server.MCPServer, kv *keyvalembd.KeyValueEmbd, ti *textIndex) []
 // semantic rag_search. It needs no embeddings and works with Ollama down.
 func ragFindTool(ti *textIndex) server.ServerTool {
 	opt := mcp.NewTool("rag_find",
-		mcp.WithDescription(`Exact keyword search (SQL LIKE) across the knowledge base.
+		mcp.WithDescription(`Exact keyword search across the knowledge base.
 Complements rag_search (semantic): use it for an exact word or phrase —
-names, places, quotes (e.g. "Золотая Вобла", "Шашлычная 1957"). Case-insensitive
-for ASCII; a first-letter-uppercase variant is also tried for Russian.`),
+names, places, quotes (e.g. "Золотая Вобла", "Шашлычная 1957").
+Case-insensitive for the whole Unicode range.`),
 		mcp.WithString("keyword",
 			mcp.Description("Keyword or phrase to search for"),
 			mcp.Required(),

@@ -56,6 +56,17 @@ func TestTextIndexFind(t *testing.T) {
 		t.Fatalf("cyrillic search: %+v", res)
 	}
 
+	// Cyrillic is case-insensitive too (ucontains).
+	for _, q := range []string{"золотая вобла", "ЗОЛОТАЯ ВОБЛА", "вОбЛа"} {
+		res, err = ti.find(q, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res) != 1 {
+			t.Fatalf("case-insensitive %q: %+v", q, res)
+		}
+	}
+
 	// ASCII keyword is case-insensitive.
 	res, err = ti.find("COFFEE", 10)
 	if err != nil {
