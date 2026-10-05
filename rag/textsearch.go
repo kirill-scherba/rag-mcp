@@ -7,6 +7,7 @@ package rag
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -81,8 +82,10 @@ type FindResult struct {
 }
 
 // Find searches keys and values with a Unicode-aware case-insensitive
-// substring match (ucontains). Chunk text lives in kv_embeddings (plain text);
-// document descriptions live in kv_data under "/meta" keys.
+// substring match (ucontains). It reads kv_data (not kv_embeddings), so it
+// works whether or not embeddings were generated — e.g. with Ollama down.
+// Chunk rows carry the text in their JSON value; document rows carry a
+// description.
 func (t *TextIndex) Find(keyword string, limit int) ([]FindResult, error) {
 	if limit <= 0 {
 		limit = 20
@@ -92,15 +95,12 @@ func (t *TextIndex) Find(keyword string, limit int) ([]FindResult, error) {
 	}
 
 	query := `
-		SELECT key, text AS val FROM kv_embeddings
-		WHERE ucontains(text, ?) OR ucontains(key, ?)
-		UNION ALL
 		SELECT key, CAST(value AS TEXT) AS val FROM kv_data
-		WHERE key LIKE '%/meta' AND (ucontains(key, ?) OR ucontains(CAST(value AS TEXT), ?))
+		WHERE ucontains(key, ?) OR ucontains(CAST(value AS TEXT), ?)
 		ORDER BY key
 		LIMIT ?`
 
-	rows, err := t.db.Query(query, keyword, keyword, keyword, keyword, limit)
+	rows, err := t.db.Query(query, keyword, keyword, limit)
 	if err != nil {
 		return nil, fmt.Errorf("keyword search: %w", err)
 	}
@@ -112,10 +112,28 @@ func (t *TextIndex) Find(keyword string, limit int) ([]FindResult, error) {
 		if err := rows.Scan(&key, &val); err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
 		}
-		results = append(results, FindResult{Key: key, Text: val})
+		results = append(results, FindResult{Key: key, Text: readableValue(val)})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows iteration: %w", err)
 	}
 	return results, nil
+}
+
+// readableValue returns the chunk text or document description from a stored
+// JSON value, falling back to the raw value.
+func readableValue(val string) string {
+	var m struct {
+		Text        string `json:"text"`
+		Description string `json:"description"`
+	}
+	if json.Unmarshal([]byte(val), &m) == nil {
+		if m.Text != "" {
+			return m.Text
+		}
+		if m.Description != "" {
+			return m.Description
+		}
+	}
+	return val
 }

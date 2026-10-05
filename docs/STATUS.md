@@ -29,6 +29,7 @@
 | 2026-10-04 | Unicode case-insensitive keyword search (`ucontains()` SQL function) | ✅ Done |
 | 2026-10-05 | G1a: extract the pure core into package `rag` (chunker, keyword search, extractor); main uses it | ✅ Done |
 | 2026-10-05 | G1b: extract storage into `rag.Store`; main is now a thin MCP wrapper over the library | ✅ Done |
+| 2026-10-05 | Fix: `rag_find` reads `kv_data` (works with Ollama down / no embeddings) | ✅ Done |
 
 ## Current State
 

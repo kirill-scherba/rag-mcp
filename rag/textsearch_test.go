@@ -5,7 +5,6 @@
 package rag
 
 import (
-	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,30 +15,24 @@ import (
 func TestTextIndexFind(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
-	// Create the schema with keyvalembd, then insert chunk text directly:
-	// chunk text lives in kv_embeddings, and a unit test has no Ollama to
-	// generate embeddings.
+	// Store chunk rows directly in kv_data (no embeddings needed): Find reads
+	// kv_data, so it works with Ollama down.
 	kv, err := keyvalembd.New(dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	kv.Close()
-
-	db, err := sql.Open("sqlite", "file:"+dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	rows := []struct{ key, text string }{
-		{"rag/docs/a/chunk/0000", "Гуляли по городу и увидели вывеску Золотая Вобла."},
-		{"rag/docs/a/chunk/0001", "Coffee and tea are served here."},
-		{"rag/docs/b/chunk/0000", "Совсем другой текст."},
+	rows := []struct{ key, value string }{
+		{"rag/docs/a/chunk/0000", `{"text":"Гуляли по городу и увидели вывеску Золотая Вобла."}`},
+		{"rag/docs/a/chunk/0001", `{"text":"Coffee and tea are served here."}`},
+		{"rag/docs/b/chunk/0000", `{"text":"Совсем другой текст."}`},
+		{"rag/docs/a/meta", `{"description":"Заметки о прогулке"}`},
 	}
 	for _, r := range rows {
-		if _, err := db.Exec(`INSERT INTO kv_embeddings (key, text) VALUES (?, ?)`, r.key, r.text); err != nil {
+		if _, err := kv.Set(r.key, []byte(r.value)); err != nil {
 			t.Fatal(err)
 		}
 	}
+	kv.Close()
 
 	ti, err := OpenTextIndex(dbPath)
 	if err != nil {
@@ -74,6 +67,15 @@ func TestTextIndexFind(t *testing.T) {
 	}
 	if len(res) != 1 {
 		t.Fatalf("ascii case-insensitive search: %+v", res)
+	}
+
+	// Document description is found too.
+	res, err = ti.Find("прогулке", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 1 || !strings.Contains(res[0].Text, "прогулке") {
+		t.Fatalf("description search: %+v", res)
 	}
 
 	// No match.
