@@ -1,5 +1,17 @@
 # rag-mcp — Design
 
+## Package layout
+
+The repository is being split so the engine can be reused (e.g. by the AnyText
+GUI server):
+
+- `rag/` — the reusable core (public): `Chunk`/`Description` (sentence-aware
+  chunking), `TextIndex` (Unicode case-insensitive keyword search),
+  `ExtractFileText` (file → text via `EXTRACTOR_CMD` or raw read). Storage
+  (`Store`: ingest/search/list/delete over keyvalembd) moves here next (G1b).
+- root package `main` — the MCP server: tool schemas, formatting, and the
+  eventual thin wrapper over `rag`.
+
 ## Architecture
 
 ```
