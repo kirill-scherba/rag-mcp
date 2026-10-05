@@ -92,8 +92,8 @@ func TestTokenizeCommand(t *testing.T) {
 		in   string
 		want []string
 	}{
-		{`pdftotext {file}`, []string{"totext", "{file}"}},
-		{`pdftotext -layout {file}`, []string{"totext", "-l", "eng+rus", "{file}"}},
+		{`pdftotext {file}`, []string{"pdftotext", "{file}"}},
+		{`pdftotext -layout {file}`, []string{"pdftotext", "-layout", "{file}"}},
 		{`prog "a b" c`, []string{"prog", "a b", "c"}},
 		{`prog 'a b'`, []string{"prog", "a b"}},
 		{`prog a\ b`, []string{"prog", "a b"}},
