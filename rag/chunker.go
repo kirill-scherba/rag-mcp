@@ -147,12 +147,16 @@ func Chunk(text string) []string {
 		}
 	}
 
-	if len(sentences) == 0 {
-		return []string{text}
-	}
-	// Single sentence — return as-is
+	// Short document (few sentences) — keep them all in one chunk.
 	if len(sentences) <= overlapSentences+1 {
-		return []string{sentences[0].text}
+		var b strings.Builder
+		for i, s := range sentences {
+			if i > 0 {
+				b.WriteByte(' ')
+			}
+			b.WriteString(s.text)
+		}
+		return []string{b.String()}
 	}
 
 	var chunks []string

@@ -72,6 +72,20 @@ func TestChunkShortText(t *testing.T) {
 	}
 }
 
+// TestChunkShortMultiSentence verifies a 2-3 sentence document keeps all of it.
+func TestChunkShortMultiSentence(t *testing.T) {
+	input := "First one. Second one. Third one."
+	got := Chunk(input)
+	if len(got) != 1 {
+		t.Fatalf("chunks=%d, want 1", len(got))
+	}
+	for _, want := range []string{"First one.", "Second one.", "Third one."} {
+		if !strings.Contains(got[0], want) {
+			t.Errorf("chunk %q lost %q", got[0], want)
+		}
+	}
+}
+
 // TestChunkWindowsLineEndings verifies CRLF normalization.
 func TestChunkWindowsLineEndings(t *testing.T) {
 	input := "Line one.\r\n\r\nLine two."
