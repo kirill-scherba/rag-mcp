@@ -35,8 +35,8 @@
 - **Deduplication** — removes consecutive identical chunks that can occur with tiny documents.
 
 ### 3. Tools (`tools.go`)
-- **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). A file is converted with the `anytext/totext` library (text, DOCX/HTML/CSV, PDF, images via OCR). Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
-- **`rag_ingest_directory`**: Accepts `key_prefix`, `dir_path`, and optional `pattern` (default `*.md,*.txt`). Scans directory, converts each matching file with `anytext/totext`, and ingests it under `<key_prefix>/<filename>`.
+- **`rag_ingest`**: Accepts `key` (document key) and either `text` (inline content) or `file_path` (path to file on disk). A `file_path` is turned into text by `EXTRACTOR_CMD` when that environment variable is set, otherwise the file is read as text. Splits into chunks, generates embeddings, stores in keyvalembd. Returns chunk count.
+- **`rag_ingest_directory`**: Accepts `key_prefix`, `dir_path`, and optional `pattern` (default `*.md,*.txt`). Scans directory, turns each matching file into text the same way, and ingests it under `<key_prefix>/<filename>`.
 - **`rag_ingest_url`**: Accepts `url` (required) and optional `key`. Fetches URL via HTTP GET, chunks and stores content. Auto-generates key from host+path if not provided.
 - **`rag_search`**: Accepts `query` text. Performs semantic search on stored chunks and returns the matching chunks with similarity scores and text previews. No LLM generation.
 - **`rag_find`**: Accepts `keyword` text. Exact keyword search (no embeddings) over chunk text and document descriptions, case-insensitive for the whole Unicode range. Complements `rag_search`.
@@ -49,7 +49,11 @@
 - Registers a deterministic SQLite scalar function `ucontains(haystack, needle)` backed by Go `strings.ToLower`, so matching folds the whole Unicode range — unlike SQLite's `LIKE`/`lower`, which fold ASCII only. Works with pure-Go `modernc.org/sqlite`; no CGO, no external extension.
 - Searches chunk text in `kv_embeddings` and document descriptions in `kv_data` under `/meta` keys. Full scan (no index); FTS5 is the planned upgrade if the corpus grows.
 
-### 5. LLM Generation (`generate.go`)
+### 5. File extraction (`extractor.go`)
+- `rag_ingest` / `rag_ingest_directory` delegate file → text to an external command when `EXTRACTOR_CMD` is set (e.g. `EXTRACTOR_CMD='pdftotext {file} -'`). The command string is tokenized like a shell word sequence (quotes supported, no pipes); `{file}` is replaced with the path, or the path is appended when the placeholder is absent. `EXTRACTOR_TIMEOUT` (default 10m) bounds each run.
+- With `EXTRACTOR_CMD` unset, a file is read as text — the original behaviour. This keeps the repository self-contained (no dependency on a specific extractor).
+
+### 6. LLM Generation (`generate.go`)
 - `buildRAGPrompt()` — formats context chunks + system instruction + user question into Ollama chat messages.
 - `generateAnswerStreamWithOptions()` — sends request to Ollama `/api/chat` endpoint with `stream: true`, aggregates NDJSON token chunks, and optionally emits tokens to stderr only when explicitly enabled.
 - The model is an Ollama identifier (`deepseek-v4.1-flash:cloud`, default) and is selectable via `LLM_MODEL` / `--model`; only `rag_query` uses the LLM.

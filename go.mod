@@ -3,7 +3,6 @@ module github.com/kirill-scherba/rag-mcp
 go 1.26.2
 
 require (
-	github.com/kirill-scherba/anytext v0.2.3
 	github.com/kirill-scherba/keyvalembd v0.6.1
 	github.com/kirill-scherba/s3lite v0.1.2
 	github.com/mark3labs/mcp-go v0.55.0
@@ -25,7 +24,6 @@ require (
 	github.com/google/flatbuffers v1.12.1 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/hhrutter/tiff v1.0.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kirill-scherba/sqlh v0.8.1 // indirect
 	github.com/klauspost/compress v1.12.3 // indirect
@@ -33,13 +31,11 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opencensus.io v0.22.5 // indirect
-	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

@@ -8,32 +8,107 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
 
-func TestExtractFileTextPlain(t *testing.T) {
+func writeScript(t *testing.T, dir, body string) string {
+	t.Helper()
+	path := filepath.Join(dir, "extractor.sh")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestExtractWithoutCommandReadsRaw(t *testing.T) {
+	t.Setenv(extractorCmdEnv, "")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "doc.txt")
-	if err := os.WriteFile(path, []byte("hello rag\nsecond line\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("plain text\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	got, err := extractFileText(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(got, "hello rag") || !strings.Contains(got, "second line") {
+	if got != "plain text\n" {
 		t.Errorf("got %q", got)
 	}
 }
 
-func TestExtractFileTextUnsupported(t *testing.T) {
+func TestExtractWithCommand(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "blob.bin")
-	if err := os.WriteFile(path, []byte{0x00, 0x01, 0x02, 0x03}, 0o600); err != nil {
+	doc := filepath.Join(dir, "doc.bin")
+	if err := os.WriteFile(doc, []byte("RAW"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := extractFileText(context.Background(), path); err == nil {
-		t.Error("expected an error for an unsupported format")
+	script := writeScript(t, dir, `echo "EXTRACTED:"; cat "$1"`)
+	t.Setenv(extractorCmdEnv, script)
+
+	got, err := extractFileText(context.Background(), doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "EXTRACTED:") || !strings.Contains(got, "RAW") {
+		t.Errorf("extractor not used: %q", got)
+	}
+}
+
+func TestExtractWithPlaceholder(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "doc.txt")
+	if err := os.WriteFile(doc, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	script := writeScript(t, dir, `echo "GOT:$1"`)
+	t.Setenv(extractorCmdEnv, script+" {file}")
+
+	got, err := extractFileText(context.Background(), doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "GOT:"+doc) {
+		t.Errorf("placeholder not substituted: %q", got)
+	}
+}
+
+func TestExtractCommandFailure(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "doc.txt")
+	if err := os.WriteFile(doc, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(extractorCmdEnv, "false") // exits non-zero
+
+	if _, err := extractFileText(context.Background(), doc); err == nil {
+		t.Fatal("expected an error from a failing extractor")
+	}
+}
+
+func TestTokenizeCommand(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{`totext {file}`, []string{"totext", "{file}"}},
+		{`totext -l eng+rus {file}`, []string{"totext", "-l", "eng+rus", "{file}"}},
+		{`prog "a b" c`, []string{"prog", "a b", "c"}},
+		{`prog 'a b'`, []string{"prog", "a b"}},
+		{`prog a\ b`, []string{"prog", "a b"}},
+		{`  spaced   out  `, []string{"spaced", "out"}},
+	}
+	for _, c := range cases {
+		got, err := tokenizeCommand(c.in)
+		if err != nil {
+			t.Fatalf("%q: %v", c.in, err)
+		}
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%q: got %v, want %v", c.in, got, c.want)
+		}
+	}
+	if _, err := tokenizeCommand(`unbalanced "quote`); err == nil {
+		t.Error("expected an error for unbalanced quotes")
 	}
 }

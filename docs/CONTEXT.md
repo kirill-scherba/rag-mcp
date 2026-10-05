@@ -23,7 +23,7 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 ## Integration
 
 - Uses [keyvalembd](https://github.com/kirill-scherba/keyvalembd) v0.6.x for a pure-Go SQLite-backed key-value store with vector embeddings (`modernc.org/sqlite` + `vecindex`, no CGO).
-- Uses [anytext/totext](https://github.com/kirill-scherba/anytext) to turn any ingested file (text, DOCX, HTML, PDF, images) into text.
+- Optional file extraction: with `EXTRACTOR_CMD` set, ingested files are converted by that command; with it unset, files are read as text (the repository stays self-contained).
 - Uses Ollama for both embeddings (`embeddinggemma:latest`) and answer generation (`deepseek-v4.1-flash:cloud`).
 - Runtime dependency licenses (Ollama MIT, embeddinggemma/Gemma terms, no CGO): see [LICENSING.md](LICENSING.md).
 
@@ -45,9 +45,9 @@ rag-mcp is an MCP (Model Context Protocol) server that provides Retrieval-Augmen
 
 ## Recent Fixes
 
-- 2026-10-04: **keyvalembd upgraded to v0.6.1** (pure-Go `modernc.org/sqlite` + in-process `vecindex`, DiskANN/libSQL removed). The existing database keeps its legacy `embedding` BLOB column and keyvalembd reads it transparently; verified by running the same semantic query before and after — **identical results and scores**. Also bumped `anytext` to v0.2.3.
+- 2026-10-04: **keyvalembd upgraded to v0.6.1** (pure-Go `modernc.org/sqlite` + in-process `vecindex`, DiskANN/libSQL removed). The existing database keeps its legacy `embedding` BLOB column and keyvalembd reads it transparently; verified by running the same semantic query before and after — **identical results and scores**.
 - 2026-10-04: **answer model fixed** to `deepseek-v4.1-flash:cloud` (the previous `deepseek-v4-flash:cloud` was retired and Ollama returned HTTP 410). The model is provider-specific and overridable with `LLM_MODEL` or `--model`; it is the single knob — see the provider note below.
-- 2026-10-04: `rag_ingest` and `rag_ingest_directory` convert `file_path` through the [anytext/totext](https://github.com/kirill-scherba/anytext) library instead of `os.ReadFile`, so any supported document can be ingested directly: text, Markdown, HTML, CSV/TSV, DOCX, PDF (native text plus OCR for scanned pages) and images (OCR). Pages are joined with a blank line before chunking.
+- 2026-10-04: file ingestion is **extractor-agnostic**: set `EXTRACTOR_CMD` (e.g. `pdftotext {file} -`) to process files; unset means the file is read as text. The previously built-in converter was removed so this repository has no dependency on a private module.
 - 2026-05-19: `rag_query` now keeps stderr token streaming disabled by default to avoid blocking MCP clients that do not drain stderr pipes. `rag-cli` can still enable legacy stderr token streaming with `--stream-stderr`.
 - 2026-05-19: Embedding writes and semantic search retry `embedder is not ready` during keyvalembd/Ollama cold start before returning an error.
 

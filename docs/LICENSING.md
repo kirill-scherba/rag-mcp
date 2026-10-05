@@ -13,7 +13,6 @@ runtime and whether it may ship inside a paid product.
 | `github.com/mark3labs/mcp-go` | MIT | MCP |
 | `github.com/spf13/cobra` | MIT | CLI |
 | `github.com/kirill-scherba/s3lite` | BSD-3-Clause | storage interface |
-| `github.com/kirill-scherba/anytext` | proprietary (first-party) | file → text, see its docs/LICENSING.md |
 
 No copyleft — everything shipped is MIT or BSD. Since keyvalembd v0.6.x
 dropped libSQL/go-libsql for `modernc.org/sqlite`, the whole RAG now builds

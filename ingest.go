@@ -26,7 +26,9 @@ func ragIngestTool(kv *keyvalembd.KeyValueEmbd) server.ServerTool {
 		mcp.WithDescription(`Ingest a document into the RAG knowledge base.
 Splits the text into chunks, generates embeddings for each chunk,
 and stores them for semantic search.
-Provide either 'text' (inline content) or 'file_path' (path to file on disk).`),
+Provide either 'text' (inline content) or 'file_path' (path to file on disk).
+With EXTRACTOR_CMD configured, file_path is processed by that command;
+otherwise the file is read as text.`),
 		mcp.WithString("key",
 			mcp.Description("Document key (e.g. rag/docs/cooksy/architecture)"),
 			mcp.Required(),
